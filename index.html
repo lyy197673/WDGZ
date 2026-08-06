@@ -20,47 +20,63 @@
         <div class="blob blob-3"></div>
     </div>
 
+    <!-- 顶层 Toast 消息提示框 -->
+    <div id="toast-message" class="toast-message glass-pill"></div>
+
     <!-- 通用弹窗遮罩层 -->
     <div class="modal-backdrop" id="modal-backdrop"></div>
 
-    <!-- 新增：导出格式选择弹窗 -->
+    <!-- 导出格式与自定义文件名选择小弹窗 -->
     <div class="export-modal-card glass-panel" id="modal-export-format">
         <div class="sidebar-header">
-            <h3><i class="fa-solid fa-file-export"></i> 选择导出格式</h3>
+            <h3><i class="fa-solid fa-file-export"></i> 导出设置</h3>
             <button class="icon-btn btn-close-export-modal"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="export-format-options">
-            <div class="format-card active" data-format="pdf">
-                <div class="format-card-left">
-                    <div class="format-card-icon"><i class="fa-regular fa-file-pdf"></i></div>
-                    <div class="format-card-info">
-                        <h4>PDF 高清文档 (推荐)</h4>
-                        <p>适合多页合同，保持矢量清晰度</p>
-                    </div>
+
+        <div class="export-modal-body">
+            <!-- 新增：自定义文件名输入框 -->
+            <div class="custom-filename-wrapper">
+                <label for="input-custom-filename"><i class="fa-solid fa-pen-to-square"></i> 导出文件名 (可选)</label>
+                <div class="glass-input-wrapper custom-name-input">
+                    <i class="fa-solid fa-file-signature"></i>
+                    <input type="text" id="input-custom-filename" placeholder="请输入导出文件名，默认使用原文件名">
                 </div>
-                <div class="format-radio"></div>
             </div>
 
-            <div class="format-card" data-format="png">
-                <div class="format-card-left">
-                    <div class="format-card-icon"><i class="fa-regular fa-image"></i></div>
-                    <div class="format-card-info">
-                        <h4>PNG 高清图片</h4>
-                        <p>适合透明背景或单页图片导出</p>
+            <!-- 导出格式选项 -->
+            <div class="export-format-options">
+                <div class="format-card active" data-format="pdf">
+                    <div class="format-card-left">
+                        <div class="format-card-icon"><i class="fa-regular fa-file-pdf"></i></div>
+                        <div class="format-card-info">
+                            <h4>PDF 高清文档 (推荐)</h4>
+                            <p>适合多页合同，保持矢量清晰度</p>
+                        </div>
                     </div>
+                    <div class="format-radio"></div>
                 </div>
-                <div class="format-radio"></div>
-            </div>
 
-            <div class="format-card" data-format="jpg">
-                <div class="format-card-left">
-                    <div class="format-card-icon"><i class="fa-regular fa-file-image"></i></div>
-                    <div class="format-card-info">
-                        <h4>JPG 压缩图片</h4>
-                        <p>文件体积小，适合日常微信快速传输</p>
+                <div class="format-card" data-format="png">
+                    <div class="format-card-left">
+                        <div class="format-card-icon"><i class="fa-regular fa-image"></i></div>
+                        <div class="format-card-info">
+                            <h4>PNG 高清图片</h4>
+                            <p>适合透明背景或单页图片导出</p>
+                        </div>
                     </div>
+                    <div class="format-radio"></div>
                 </div>
-                <div class="format-radio"></div>
+
+                <div class="format-card" data-format="jpg">
+                    <div class="format-card-left">
+                        <div class="format-card-icon"><i class="fa-regular fa-file-image"></i></div>
+                        <div class="format-card-info">
+                            <h4>JPG 压缩图片</h4>
+                            <p>文件体积小，适合日常传输分享</p>
+                        </div>
+                    </div>
+                    <div class="format-radio"></div>
+                </div>
             </div>
         </div>
 
@@ -72,7 +88,7 @@
     </div>
 
     <div class="app-container">
-        <!-- 顶部导航栏 -->
+        <!-- 顶部高斯玻璃导航栏 -->
         <header class="top-bar glass-panel">
             <div class="brand">
                 <div class="brand-logo"><i class="fa-solid fa-stamp"></i></div>
@@ -80,10 +96,12 @@
             </div>
             
             <div class="toolbar-center">
+                <!-- 移动端弹窗触发按钮 -->
                 <button id="btn-toggle-left-sidebar" class="glass-btn xs primary-subtle mobile-only">
                     <i class="fa-solid fa-box-archive"></i> 印章库
                 </button>
 
+                <!-- 隐藏的全局文件选择器 -->
                 <input type="file" id="file-input-doc" accept="image/*,application/pdf" style="display: none;">
 
                 <button id="btn-toggle-right-sidebar" class="glass-btn xs primary-subtle mobile-only">
@@ -105,7 +123,7 @@
                     <h3><i class="fa-solid fa-box-archive"></i> 印章库</h3>
                     <div class="sidebar-actions">
                         <button id="btn-change-dir" class="glass-btn xs primary-subtle" title="更改识别目录">
-                            <i class="fa-solid fa-folder-gear"></i> 选择/更改印章目录
+                            <i class="fa-solid fa-folder-gear"></i> 选择/更换印章目录
                         </button>
                         <button id="btn-toggle-all-folders" class="icon-btn" title="全部展开/折叠">
                             <i class="fa-solid fa-layer-group"></i>

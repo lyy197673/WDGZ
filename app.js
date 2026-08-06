@@ -43,6 +43,17 @@ function getEventCoords(e) {
     return { clientX: e.clientX, clientY: e.clientY };
 }
 
+// 显示 Toast 顶部通知
+function showToast(message) {
+    const toast = document.getElementById('toast-message');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2500);
+}
+
 // --- 全局状态 ---
 const state = {
     zoom: 1.0,
@@ -70,6 +81,13 @@ const state = {
     selectedExportFormat: 'pdf'
 };
 
+// 触摸双指捏合缩放状态追踪
+const touchZoomState = {
+    isPinching: false,
+    initialDist: 0,
+    initialZoom: 1.0
+};
+
 // --- DOM 节点 ---
 const dom = {
     viewport: document.getElementById('viewport'),
@@ -87,10 +105,11 @@ const dom = {
     btnToggleLeftSidebar: document.getElementById('btn-toggle-left-sidebar'),
     btnToggleRightSidebar: document.getElementById('btn-toggle-right-sidebar'),
 
-    // 导出弹窗
+    // 导出弹窗与自定义文件名
     modalExportFormat: document.getElementById('modal-export-format'),
     btnOpenExportModal: document.getElementById('btn-open-export-modal'),
     btnConfirmExport: document.getElementById('btn-confirm-export'),
+    inputCustomFilename: document.getElementById('input-custom-filename'),
 
     fileInputDoc: document.getElementById('file-input-doc'),
     stampCategories: document.getElementById('stamp-categories'),
@@ -310,6 +329,10 @@ function openRightModal() {
     dom.modalBackdrop.classList.add('show');
 }
 function openExportModal() {
+    // 预填推荐的提示占位符
+    if (dom.inputCustomFilename) {
+        dom.inputCustomFilename.placeholder = `请输入导出文件名，默认使用原文件名`;
+    }
     dom.modalExportFormat.classList.add('show');
     dom.modalBackdrop.classList.add('show');
 }
@@ -348,22 +371,19 @@ function clearCurrentPageStamps() {
     renderStampsForCurrentPage();
 }
 
-// 自动动态构造文件名：生成日期_原文件名_盖章名称.后缀
-function generateExportFilename(extension) {
-    // 1. 生成日期 YYYYMMDD
+// 默认推荐的基础文件名公式
+function generateDefaultBaseFilename() {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
 
-    // 2. 原文件名 (去除文件扩展名)
     let rawFileName = '文档';
     if (state.doc.file && state.doc.file.name) {
         rawFileName = state.doc.file.name.replace(/\.[^/.]+$/, "");
     }
 
-    // 3. 收集并去重所有已盖印章的名称
     const usedStampNames = [];
     Object.values(state.placedStamps).forEach(pageStamps => {
         pageStamps.forEach(stamp => {
@@ -374,21 +394,37 @@ function generateExportFilename(extension) {
     });
 
     const stampsStr = usedStampNames.length > 0 ? usedStampNames.join('_') : '已盖章';
+    return `${dateStr}_${rawFileName}_${stampsStr}`;
+}
 
-    return `${dateStr}_${rawFileName}_${stampsStr}.${extension}`;
+// 拼接最终导出的完整文件名
+function generateExportFilename(extension) {
+    const customName = dom.inputCustomFilename ? dom.inputCustomFilename.value.trim() : '';
+    if (customName) {
+        const sanitizedName = customName.replace(/\.[^/.]+$/, "");
+        return `${sanitizedName}.${extension}`;
+    }
+    return `${generateDefaultBaseFilename()}.${extension}`;
 }
 
 // --- 事件绑定 ---
 function initEvents() {
-    // 弹窗切换触发
     dom.btnToggleLeftSidebar?.addEventListener('click', openLeftModal);
     dom.btnToggleRightSidebar?.addEventListener('click', openRightModal);
-    dom.btnOpenExportModal?.addEventListener('click', openExportModal);
+    
+    // 导出前先检测画布是否有内容
+    dom.btnOpenExportModal?.addEventListener('click', () => {
+        if (!state.doc.file || !state.doc.originalWidth) {
+            showToast('当前画布暂无内容，请先上传文档！');
+            return;
+        }
+        openExportModal();
+    });
     
     dom.modalBackdrop?.addEventListener('click', closeModals);
     document.querySelectorAll('.btn-close-modal, .btn-close-export-modal').forEach(btn => btn.addEventListener('click', closeModals));
 
-    // 导出卡片选择
+    // 导出格式卡片选择
     document.querySelectorAll('.format-card').forEach(card => {
         card.addEventListener('click', (e) => {
             document.querySelectorAll('.format-card').forEach(c => c.classList.remove('active'));
@@ -470,9 +506,20 @@ function initEvents() {
         });
     });
 
-    // 画布平移 (Mouse & Touch)
-    const startPan = (e) => {
-        if (e.target === dom.viewport || e.target === dom.docCanvas || e.target === dom.stampLayer) {
+    // 画布平移与双指捏合（Pinch-to-Zoom）手势控制
+    const handlePanOrPinchStart = (e) => {
+        if (e.touches && e.touches.length === 2) {
+            // 双指捏合手势开始
+            state.isPanning = false;
+            touchZoomState.isPinching = true;
+            touchZoomState.initialDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            touchZoomState.initialZoom = state.zoom;
+        } else if (e.target === dom.viewport || e.target === dom.docCanvas || e.target === dom.stampLayer) {
+            // 单指/鼠标平移
+            touchZoomState.isPinching = false;
             state.isPanning = true;
             const coords = getEventCoords(e);
             state.startPanX = coords.clientX - state.panX;
@@ -481,8 +528,19 @@ function initEvents() {
         }
     };
 
-    const movePan = (e) => {
-        if (state.isPanning) {
+    const handlePanOrPinchMove = (e) => {
+        if (touchZoomState.isPinching && e.touches && e.touches.length === 2) {
+            // 双指捏合实时计算缩放倍率
+            const currentDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            if (touchZoomState.initialDist > 0) {
+                const factor = currentDist / touchZoomState.initialDist;
+                setZoom(touchZoomState.initialZoom * factor);
+            }
+        } else if (state.isPanning) {
+            // 单指/鼠标平移
             const coords = getEventCoords(e);
             state.panX = coords.clientX - state.startPanX;
             state.panY = coords.clientY - state.startPanY;
@@ -490,15 +548,22 @@ function initEvents() {
         }
     };
 
-    const endPan = () => { state.isPanning = false; };
+    const handlePanOrPinchEnd = (e) => {
+        if (e.touches && e.touches.length < 2) {
+            touchZoomState.isPinching = false;
+        }
+        if (!e.touches || e.touches.length === 0) {
+            state.isPanning = false;
+        }
+    };
 
-    dom.viewport.addEventListener('mousedown', startPan);
-    window.addEventListener('mousemove', movePan);
-    window.addEventListener('mouseup', endPan);
+    dom.viewport.addEventListener('mousedown', handlePanOrPinchStart);
+    window.addEventListener('mousemove', handlePanOrPinchMove);
+    window.addEventListener('mouseup', handlePanOrPinchEnd);
 
-    dom.viewport.addEventListener('touchstart', startPan, { passive: true });
-    window.addEventListener('touchmove', movePan, { passive: true });
-    window.addEventListener('touchend', endPan);
+    dom.viewport.addEventListener('touchstart', handlePanOrPinchStart, { passive: true });
+    window.addEventListener('touchmove', handlePanOrPinchMove, { passive: true });
+    window.addEventListener('touchend', handlePanOrPinchEnd);
 
     dom.viewport.addEventListener('wheel', (e) => {
         e.preventDefault();

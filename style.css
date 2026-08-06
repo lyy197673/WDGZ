@@ -48,13 +48,22 @@ body {
 .blob-2 { width: 450px; height: 450px; background: #c2e9fb; bottom: -100px; right: -80px; }
 .blob-3 { width: 300px; height: 300px; background: #e0c3fc; top: 40%; left: 30%; }
 
+/* Toast 提示框 */
+.toast-message {
+    position: fixed; top: 20px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    z-index: 4000; padding: 8px 18px; font-size: 13px; font-weight: 600;
+    color: var(--text-primary); background: rgba(255, 255, 255, 0.95);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    opacity: 0; pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast-message.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 .app-container {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    height: 100dvh;
+    position: relative; z-index: 1; display: flex; flex-direction: column;
+    height: 100vh; height: 100dvh;
 }
 
 .glass-panel {
@@ -66,7 +75,7 @@ body {
 }
 
 .glass-pill {
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.82);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid var(--glass-border);
@@ -76,14 +85,9 @@ body {
 
 /* 顶部导航条 */
 .top-bar {
-    height: 56px;
-    padding: 0 18px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 10px 14px 0 14px;
-    border-radius: 20px;
-    flex-shrink: 0;
+    height: 56px; padding: 0 18px; display: flex;
+    align-items: center; justify-content: space-between;
+    margin: 10px 14px 0 14px; border-radius: 20px; flex-shrink: 0;
 }
 
 .brand { display: flex; align-items: center; gap: 8px; }
@@ -273,46 +277,52 @@ input[type="range"] { width: 100%; accent-color: var(--accent-blue); }
 .empty-tip { text-align: center; color: var(--text-secondary); padding: 40px 10px; font-size: 12px; }
 .empty-tip i { font-size: 32px; opacity: 0.3; margin-bottom: 10px; display: block; }
 
-/* 导出格式选择小弹窗样式 */
+/* 导出格式与自定义文件名小弹窗 */
 .export-modal-card {
     position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%) scale(0.9);
-    width: 90vw; max-width: 380px; z-index: 1000;
-    border-radius: 24px; padding: 20px;
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+    transform: translate(-50%, -50%) scale(0.92);
+    width: 90vw; max-width: 380px; z-index: 3000;
+    border-radius: 24px; padding: 18px 20px;
+    background: #ffffff;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
     opacity: 0; pointer-events: none;
     transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .export-modal-card.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
 
-.export-format-options { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.custom-filename-wrapper { margin-bottom: 12px; }
+.custom-filename-wrapper label { display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+.custom-name-input { margin: 0; }
+.custom-name-input input { background: rgba(242, 244, 248, 0.7); font-size: 12px; }
+
+.export-format-options { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .format-card {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.6);
+    padding: 10px 12px; border-radius: 12px; background: rgba(242, 244, 248, 0.7);
     border: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease;
 }
 .format-card:hover, .format-card.active {
     background: white; border-color: var(--accent-blue); box-shadow: 0 4px 14px rgba(0, 122, 255, 0.12);
 }
-.format-card-left { display: flex; align-items: center; gap: 12px; }
+.format-card-left { display: flex; align-items: center; gap: 10px; }
 .format-card-icon {
-    width: 36px; height: 36px; border-radius: 10px;
+    width: 34px; height: 34px; border-radius: 8px;
     background: rgba(0, 122, 255, 0.1); color: var(--accent-blue);
-    display: flex; align-items: center; justify-content: center; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
 }
-.format-card-info h4 { font-size: 13px; font-weight: 700; color: var(--text-primary); }
-.format-card-info p { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+.format-card-info h4 { font-size: 12px; font-weight: 700; color: var(--text-primary); }
+.format-card-info p { font-size: 10px; color: var(--text-secondary); margin-top: 1px; }
 .format-radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--text-secondary); }
 .format-card.active .format-radio { border-color: var(--accent-blue); background: var(--accent-blue); }
 
 .modal-footer { margin-top: 10px; }
 
-/* 弹窗遮罩 */
+/* 彻底解决手机端模糊的独立遮罩 */
 .modal-backdrop {
-    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    z-index: 900; opacity: 0; pointer-events: none;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    width: 100vw; height: 100vh; height: 100dvh;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 2000; opacity: 0; pointer-events: none;
     transition: opacity 0.25s ease;
 }
 .modal-backdrop.show { opacity: 1; pointer-events: auto; }
@@ -331,22 +341,22 @@ input[type="range"] { width: 100%; accent-color: var(--accent-blue); }
 
     .main-workspace { padding: 6px 8px 8px 8px; gap: 0; }
 
-    /* 手机端侧边栏重构为 iOS 悬浮小弹窗 */
+    /* 手机端侧边栏重构为纯白悬浮小弹窗 (避免模糊层重叠 Bug) */
     .sidebar.modal-card {
-        position: fixed; top: 50%; left: 50%;
-        transform: translate(-50%, -50%) scale(0.9);
-        width: 88vw; max-width: 380px; height: auto; max-height: 82vh; max-height: 82dvh;
-        z-index: 1000; border-radius: 24px;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
-        background: rgba(255, 255, 255, 0.96);
-        backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+        position: fixed !important; top: 50% !important; left: 50% !important;
+        transform: translate(-50%, -50%) scale(0.92) !important;
+        width: 88vw !important; max-width: 380px !important;
+        height: auto !important; max-height: 80vh !important; max-height: 80dvh !important;
+        z-index: 3000 !important; border-radius: 24px !important;
+        background: #ffffff !important;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25) !important;
         opacity: 0; pointer-events: none;
-        transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
 
     .sidebar.modal-card.show {
-        opacity: 1; pointer-events: auto;
-        transform: translate(-50%, -50%) scale(1);
+        opacity: 1 !important; pointer-events: auto !important;
+        transform: translate(-50%, -50%) scale(1) !important;
     }
 
     .viewport-container { border-radius: 16px; }
