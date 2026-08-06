@@ -1,5 +1,5 @@
 /**
- * StampMaster Pro - 三端适配液态玻璃盖章引擎
+ * StampMaster Pro - 在线文档盖章引擎
  */
 
 // --- IndexedDB 自动化句柄持久化库 ---
@@ -35,7 +35,7 @@ async function getSavedDirHandle() {
     }
 }
 
-// 兼容 Touch / Mouse 的坐标获取工具
+// 统一 Mouse / Touch 触摸坐标
 function getEventCoords(e) {
     if (e.touches && e.touches.length > 0) {
         return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
@@ -63,7 +63,7 @@ const state = {
     },
 
     stampLibrary: [],
-    openFolders: new Set(), // 默认全折叠
+    openFolders: new Set(),
     placedStamps: {},
     selectedStampId: null,
     nextStampId: 1
@@ -76,16 +76,15 @@ const dom = {
     docCanvas: document.getElementById('doc-canvas'),
     stampLayer: document.getElementById('stamp-layer'),
     dropZone: document.getElementById('drop-zone-overlay'),
+    btnTriggerDropZone: document.getElementById('btn-trigger-drop-zone'),
     dirStatus: document.getElementById('dir-status'),
     
-    // 移动端侧边栏蒙层与抽屉
     sidebarLeft: document.getElementById('sidebar-left'),
     sidebarRight: document.getElementById('sidebar-right'),
     sidebarBackdrop: document.getElementById('sidebar-backdrop'),
     btnToggleLeftSidebar: document.getElementById('btn-toggle-left-sidebar'),
     btnToggleRightSidebar: document.getElementById('btn-toggle-right-sidebar'),
 
-    btnImportDoc: document.getElementById('btn-import-doc'),
     fileInputDoc: document.getElementById('file-input-doc'),
     stampCategories: document.getElementById('stamp-categories'),
     stampSearch: document.getElementById('stamp-search'),
@@ -93,7 +92,6 @@ const dom = {
     btnChangeDir: document.getElementById('btn-change-dir'),
     folderInputFallback: document.getElementById('folder-input-fallback'),
     
-    // 临时印章按钮
     btnAddTempStamp: document.getElementById('btn-add-temp-stamp'),
     inputTempStamp: document.getElementById('input-temp-stamp'),
 
@@ -126,12 +124,10 @@ const dom = {
 window.addEventListener('DOMContentLoaded', async () => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     initEvents();
-    
-    // 自动读取记忆目录
     await autoDetectStamps();
 });
 
-// 自动检测与识别程序
+// 自动读取关联识别目录
 async function autoDetectStamps() {
     state.stampLibrary = [];
 
@@ -161,10 +157,10 @@ async function autoDetectStamps() {
         }
     } catch (e) {}
 
-    updateDirStatus('未关联目录，可点击更改目录', true);
+    updateDirStatus('可点击更改目录', true);
 }
 
-// 更改/选择新印章识别目录
+// 更改识别目录
 async function selectAndSaveNewDirectory() {
     if ('showDirectoryPicker' in window) {
         try {
@@ -208,7 +204,7 @@ async function scanDirectoryHandle(dirHandle, currentPath) {
     }
 }
 
-// 渲染印章分类 UI 列表
+// 渲染可折叠印章库 UI 列表
 function renderStampLibraryUI() {
     const query = dom.stampSearch.value.trim().toLowerCase();
     dom.stampCategories.innerHTML = '';
@@ -217,8 +213,8 @@ function renderStampLibraryUI() {
         dom.stampCategories.innerHTML = `
             <div class="empty-tip">
                 <i class="fa-solid fa-folder-open"></i>
-                <p>未在当前目录找到 PNG 透明印章</p>
-                <p style="font-size:11px; margin-top:6px; opacity:0.7;">可使用上方“临时上传”或点击“更改目录”</p>
+                <p>未找到透明印章</p>
+                <p style="font-size:11px; margin-top:4px; opacity:0.7;">可使用“临时上传”或点击“目录”</p>
             </div>`;
         return;
     }
@@ -268,7 +264,7 @@ function renderStampLibraryUI() {
             });
             card.addEventListener('click', () => {
                 addStampToCanvas(stamp);
-                closeMobileDrawers(); // 点击盖章后，移动端自动关抽屉
+                closeMobileDrawers();
             });
 
             gridEl.appendChild(card);
@@ -294,7 +290,7 @@ function renderStampLibraryUI() {
     });
 }
 
-// --- 移动端侧滑抽屉控制 ---
+// 移动端抽屉面板切换
 function openLeftDrawer() {
     dom.sidebarLeft.classList.add('show');
     dom.sidebarBackdrop.classList.add('show');
@@ -311,16 +307,17 @@ function closeMobileDrawers() {
 
 // --- 事件绑定 ---
 function initEvents() {
-    // 移动端侧边栏切换
     dom.btnToggleLeftSidebar?.addEventListener('click', openLeftDrawer);
     dom.btnToggleRightSidebar?.addEventListener('click', openRightDrawer);
     dom.sidebarBackdrop?.addEventListener('click', closeMobileDrawers);
     document.querySelectorAll('.btn-close-drawer').forEach(btn => btn.addEventListener('click', closeMobileDrawers));
 
-    // 更改目录触发事件
     dom.btnChangeDir.addEventListener('click', selectAndSaveNewDirectory);
 
-    // 新增：临时单个印章上传
+    // 点击中间卡片/覆盖层直接选择文档文件
+    dom.dropZone.addEventListener('click', () => dom.fileInputDoc.click());
+
+    // 临时上传单个印章
     dom.btnAddTempStamp.addEventListener('click', () => dom.inputTempStamp.click());
     dom.inputTempStamp.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -334,19 +331,16 @@ function initEvents() {
                 url: url
             };
 
-            // 添加到印章库并自动展开临时印章分类
             state.stampLibrary.unshift(tempStamp);
             state.openFolders.add('临时印章');
             renderStampLibraryUI();
 
-            // 自动直接放置到当前画布
             addStampToCanvas(tempStamp);
             closeMobileDrawers();
-            e.target.value = ''; // 重置 input
+            e.target.value = '';
         }
     });
 
-    dom.btnImportDoc.addEventListener('click', () => dom.fileInputDoc.click());
     dom.fileInputDoc.addEventListener('change', (e) => {
         if (e.target.files[0]) loadDocument(e.target.files[0]);
     });
@@ -361,7 +355,6 @@ function initEvents() {
 
     dom.stampSearch.addEventListener('input', renderStampLibraryUI);
 
-    // 一键展开 / 折叠所有文件夹
     dom.btnToggleAllFolders.addEventListener('click', () => {
         const allGroups = dom.stampCategories.querySelectorAll('.folder-group');
         let anyClosed = false;
@@ -381,7 +374,7 @@ function initEvents() {
         });
     });
 
-    // 画布 Pan & Zoom (Mouse + Touch)
+    // 画布平移 (Mouse & Touch 统一控制)
     const startPan = (e) => {
         if (e.target === dom.viewport || e.target === dom.docCanvas || e.target === dom.stampLayer) {
             state.isPanning = true;
@@ -420,11 +413,9 @@ function initEvents() {
     dom.btnZoomOut.addEventListener('click', () => setZoom(state.zoom / 1.15));
     dom.btnZoomReset.addEventListener('click', resetViewFit);
 
-    // PDF 分页
     dom.btnPrevPage.addEventListener('click', () => switchPage(state.doc.currentPage - 1));
     dom.btnNextPage.addEventListener('click', () => switchPage(state.doc.currentPage + 1));
 
-    // 属性修改
     dom.propScale.addEventListener('input', (e) => {
         updateSelectedStamp({ scale: parseFloat(e.target.value) / 100 });
         dom.propScaleVal.textContent = e.target.value + '%';
@@ -445,7 +436,6 @@ function initEvents() {
     dom.btnRot0.addEventListener('click', () => updateSelectedStamp({ rotation: 0 }));
     dom.btnRot90.addEventListener('click', () => adjustRotation(90));
 
-    // 屏幕底部居中 Export Dock 触发
     document.querySelectorAll('.export-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const format = e.currentTarget.getAttribute('data-type');
@@ -510,7 +500,7 @@ async function renderPDFPage(pageNum) {
     const ctx = dom.docCanvas.getContext('2d');
     await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-    dom.pageInfo.textContent = `${pageNum} / ${state.doc.totalPages}`;
+    dom.pageInfo.textContent = `${pageNum}/${state.doc.totalPages}`;
     syncStageSize();
     renderStampsForCurrentPage();
 }
@@ -529,7 +519,7 @@ function switchPage(pageNum) {
     renderPDFPage(pageNum);
 }
 
-// --- 印章交互 (支持 Drag & Drop 以及 Touch 触摸控制) ---
+// --- 印章交互触控 ---
 dom.viewport.addEventListener('dragover', (e) => e.preventDefault());
 dom.viewport.addEventListener('drop', (e) => {
     e.preventDefault();
@@ -787,8 +777,8 @@ function applyTransform() {
 
 function resetViewFit() {
     if (!state.doc.originalWidth) return;
-    const vpW = dom.viewport.clientWidth - 40;
-    const vpH = dom.viewport.clientHeight - 40;
+    const vpW = dom.viewport.clientWidth - 20;
+    const vpH = dom.viewport.clientHeight - 20;
     state.zoom = Math.min(vpW / state.doc.originalWidth, vpH / state.doc.originalHeight, 1.0);
     state.panX = 0; state.panY = 0;
     dom.zoomLevelText.textContent = `${Math.round(state.zoom * 100)}%`;

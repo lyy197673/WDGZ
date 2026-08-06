@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>在线文档盖章</title>
     <!-- 图标库 FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -20,7 +20,7 @@
         <div class="blob blob-3"></div>
     </div>
 
-    <!-- 移动端侧边栏遮罩蒙层 -->
+    <!-- 移动端抽屉遮罩蒙层 -->
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
     <div class="app-container">
@@ -28,7 +28,7 @@
         <header class="top-bar glass-panel">
             <div class="brand">
                 <div class="brand-logo"><i class="fa-solid fa-stamp"></i></div>
-                <span class="brand-title">在线文档盖章<span class="badge">AAA软件开发刘桑</span></span>
+                <span class="brand-title">在线文档盖章 <span class="badge">AAA软件开发刘桑</span></span>
             </div>
             
             <div class="toolbar-center">
@@ -37,39 +37,29 @@
                     <i class="fa-solid fa-box-archive"></i> 印章库
                 </button>
 
-                <button id="btn-import-doc" class="glass-btn primary">
-                    <i class="fa-solid fa-folder-open"></i> <span class="btn-text">打开文件 (图片/PDF)</span>
-                </button>
+                <!-- 隐藏的全局文件选择器 -->
                 <input type="file" id="file-input-doc" accept="image/*,application/pdf" style="display: none;">
 
-                <div class="zoom-controls glass-pill">
-                    <button id="btn-zoom-out" class="icon-btn" title="缩小"><i class="fa-solid fa-minus"></i></button>
-                    <span id="zoom-level">100%</span>
-                    <button id="btn-zoom-in" class="icon-btn" title="放大"><i class="fa-solid fa-plus"></i></button>
-                    <button id="btn-zoom-reset" class="icon-btn" title="适应屏幕"><i class="fa-solid fa-expand"></i></button>
-                </div>
-
-                <!-- 移动端属性侧边栏切换按钮 -->
                 <button id="btn-toggle-right-sidebar" class="glass-btn xs primary-subtle mobile-only">
-                    <i class="fa-solid fa-sliders"></i> 属性
+                    <i class="fa-solid fa-sliders"></i> 微调
                 </button>
             </div>
 
             <div class="toolbar-right desktop-only">
                 <div id="dir-status" class="status-badge">
-                    <i class="fa-solid fa-arrows-rotate fa-spin"></i> 正在读取印章...
+                    <i class="fa-solid fa-arrows-rotate fa-spin"></i> 读取印章中...
                 </div>
             </div>
         </header>
 
         <main class="main-workspace">
-            <!-- 左侧：印章库侧边栏 -->
+            <!-- 左侧：印章库侧滑抽屉面板 -->
             <aside class="sidebar sidebar-left glass-panel" id="sidebar-left">
                 <div class="sidebar-header">
-                    <h3><i class="fa-solid fa-box-archive"></i> 印章分类库</h3>
+                    <h3><i class="fa-solid fa-box-archive"></i> 印章库</h3>
                     <div class="sidebar-actions">
-                        <button id="btn-change-dir" class="glass-btn xs primary-subtle" title="更改印章识别目录">
-                            <i class="fa-solid fa-folder-gear"></i> 更改目录
+                        <button id="btn-change-dir" class="glass-btn xs primary-subtle" title="更改识别目录">
+                            <i class="fa-solid fa-folder-gear"></i> 选择/更改印章加载目录
                         </button>
                         <button id="btn-toggle-all-folders" class="icon-btn" title="全部展开/折叠">
                             <i class="fa-solid fa-layer-group"></i>
@@ -79,7 +69,7 @@
                     <input type="file" id="folder-input-fallback" webkitdirectory directory multiple style="display: none;">
                 </div>
 
-                <!-- 新增：临时上传单个印章按钮区 -->
+                <!-- 临时上传单个印章按钮 -->
                 <div class="temp-stamp-section">
                     <button id="btn-add-temp-stamp" class="glass-btn accent-green full-width">
                         <i class="fa-solid fa-cloud-arrow-up"></i> 临时上传单个印章
@@ -89,46 +79,53 @@
                 
                 <div class="search-box glass-input-wrapper">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="stamp-search" placeholder="搜索印章或部门...">
+                    <input type="text" id="stamp-search" placeholder="搜索印章...">
                 </div>
 
                 <div class="stamp-categories" id="stamp-categories">
-                    <!-- 可折叠印章分类动态渲染区 -->
+                    <!-- 印章列表 -->
                 </div>
             </aside>
 
-            <!-- 中间：画布工作区 -->
+            <!-- 中间：主画布工作区 -->
             <section class="viewport-container" id="viewport">
+                <!-- 右上角悬浮缩放控制胶囊 -->
+                <div class="floating-zoom-controls glass-pill">
+                    <button id="btn-zoom-out" class="icon-btn"><i class="fa-solid fa-minus"></i></button>
+                    <span id="zoom-level">100%</span>
+                    <button id="btn-zoom-in" class="icon-btn"><i class="fa-solid fa-plus"></i></button>
+                    <button id="btn-zoom-reset" class="icon-btn"><i class="fa-solid fa-expand"></i></button>
+                </div>
+
                 <div class="canvas-stage" id="canvas-stage">
                     <canvas id="doc-canvas"></canvas>
                     <div id="stamp-layer" class="stamp-layer"></div>
                 </div>
 
-                <!-- 空文档拖拽提示区 -->
+                <!-- 点击/拖拽上传文件提示区 -->
                 <div class="drop-zone-overlay" id="drop-zone-overlay">
-                    <div class="drop-zone-card glass-panel">
+                    <div class="drop-zone-card glass-panel" id="btn-trigger-drop-zone">
                         <div class="drop-icon-wrapper">
                             <i class="fa-solid fa-cloud-arrow-up"></i>
                         </div>
-                        <h2>拖拽或选择文件到此处</h2>
-                        <p>支持 PNG、JPG、WEBP、PDF 格式文档</p>
+                        <h2>单击或拖拽文件到此处选择文档</h2>
+                        <p>支持 PNG、JPG、WEBP、PDF 格式</p>
                     </div>
                 </div>
 
                 <!-- 屏幕底部居中：悬浮液态玻璃导出 Dock 工具栏 -->
                 <div class="bottom-dock-wrapper">
                     <div class="bottom-dock glass-pill">
-                        <!-- 页码导航 (仅 PDF 时显示) -->
+                        <!-- 页码导航 (仅多页 PDF 显示) -->
                         <div class="dock-segment page-controls" id="page-controls" style="display: none;">
                             <button id="btn-prev-page" class="icon-btn"><i class="fa-solid fa-chevron-left"></i></button>
-                            <span id="page-info">1 / 1</span>
+                            <span id="page-info">1/1</span>
                             <button id="btn-next-page" class="icon-btn"><i class="fa-solid fa-chevron-right"></i></button>
                             <div class="dock-divider"></div>
                         </div>
 
-                        <!-- 导出操作组 -->
+                        <!-- 导出操作 -->
                         <div class="dock-segment export-segment">
-                            <span class="dock-label desktop-only"><i class="fa-solid fa-file-export"></i> 导出：</span>
                             <button class="glass-btn export-btn" data-type="png"><i class="fa-regular fa-image"></i> PNG</button>
                             <button class="glass-btn export-btn" data-type="jpg"><i class="fa-regular fa-file-image"></i> JPG</button>
                             <button class="glass-btn export-btn primary" data-type="pdf"><i class="fa-regular fa-file-pdf"></i> 高清 PDF</button>
@@ -137,7 +134,7 @@
                 </div>
             </section>
 
-            <!-- 右侧：印章属性控制栏 -->
+            <!-- 右侧：印章属性微调侧滑抽屉 -->
             <aside class="sidebar sidebar-right glass-panel" id="sidebar-right">
                 <div class="sidebar-header">
                     <h3><i class="fa-solid fa-sliders"></i> 印章微调面板</h3>
@@ -172,7 +169,7 @@
                         </div>
 
                         <div class="prop-group">
-                            <div class="prop-label"><span>融合模式 (真实物理印章效果)</span></div>
+                            <div class="prop-label"><span>融合模式 (真实盖章效果)</span></div>
                             <select id="prop-blend" class="glass-select">
                                 <option value="multiply" selected>正片叠底 Multiply (推荐)</option>
                                 <option value="normal">正常覆盖 Normal</option>
