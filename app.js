@@ -321,7 +321,7 @@ function renderStampLibraryUI() {
 
 // 弹窗与控制
 function openLeftModal() {
-    dom.sidebarLeft.classList.add('show');
+  dom.sidebarLeft.classList.add('show');
     dom.modalBackdrop.classList.add('show');
 }
 function openRightModal() {
@@ -339,7 +339,7 @@ function openExportModal() {
 function closeModals() {
     dom.sidebarLeft.classList.remove('show');
     dom.sidebarRight.classList.remove('show');
-    dom.modalExportFormat.classList.remove('show');
+    if (dom.modalExportFormat) dom.modalExportFormat.classList.remove('show');
     dom.modalBackdrop.classList.remove('show');
 }
 
