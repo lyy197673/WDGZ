@@ -1,7 +1,7 @@
 /* --- iOS 浅色液态玻璃设计 --- */
 :root {
     --ios-bg: #f2f4f8;
-    --glass-bg: rgba(255, 255, 255, 0.72);
+    --glass-bg: rgba(255, 255, 255, 0.75);
     --glass-bg-hover: rgba(255, 255, 255, 0.92);
     --glass-border: rgba(255, 255, 255, 0.85);
     --glass-shadow: 0 12px 32px 0 rgba(31, 38, 135, 0.08);
@@ -9,8 +9,8 @@
     --accent-blue: #007aff;
     --accent-blue-hover: #0056b3;
     --accent-green: #34c759;
-    --accent-green-hover: #28a745;
     --danger-red: #ff3b30;
+    --warning-orange: #ff9500;
     
     --text-primary: #1c1c1e;
     --text-secondary: #8e8e93;
@@ -86,7 +86,7 @@ body {
     flex-shrink: 0;
 }
 
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 8px; }
 .brand-logo {
     width: 36px; height: 36px;
     background: linear-gradient(135deg, #007aff, #5856d6);
@@ -96,16 +96,10 @@ body {
 }
 .brand-title { font-size: 16px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; }
 
-/* AAA软件开发刘桑 Badge 样式 */
 .badge {
-    font-size: 11px;
-    font-weight: 600;
-    background: rgba(0, 122, 255, 0.12);
-    color: var(--accent-blue);
-    padding: 3px 10px;
-    border-radius: 12px;
-    margin-left: 8px;
-    white-space: nowrap;
+    font-size: 11px; font-weight: 600;
+    background: rgba(0, 122, 255, 0.12); color: var(--accent-blue);
+    padding: 3px 10px; border-radius: 12px; margin-left: 8px; white-space: nowrap;
 }
 
 .toolbar-center { display: flex; align-items: center; gap: 10px; }
@@ -116,14 +110,15 @@ body {
     background: rgba(255, 255, 255, 0.75);
     color: var(--text-primary); font-size: 13px; font-weight: 600;
     cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-    transition: all 0.2s ease;
-    white-space: nowrap;
+    transition: all 0.2s ease; white-space: nowrap;
 }
 .glass-btn:active { transform: scale(0.96); }
 .glass-btn.primary { background: var(--accent-blue); color: white; border: none; box-shadow: 0 4px 14px rgba(0, 122, 255, 0.25); }
 .glass-btn.primary-subtle { background: rgba(0, 122, 255, 0.1); color: var(--accent-blue); border: 1px solid rgba(0, 122, 255, 0.2); }
 .glass-btn.accent-green { background: var(--accent-green); color: white; border: none; box-shadow: 0 4px 12px rgba(52, 199, 89, 0.25); }
 .glass-btn.danger { background: rgba(255, 59, 48, 0.1); color: var(--danger-red); border: 1px solid rgba(255, 59, 48, 0.2); }
+.glass-btn.danger-subtle { background: rgba(255, 59, 48, 0.08); color: var(--danger-red); border: 1px solid rgba(255, 59, 48, 0.15); }
+.glass-btn.warning-subtle { background: rgba(255, 149, 0, 0.08); color: var(--warning-orange); border: 1px solid rgba(255, 149, 0, 0.15); }
 .glass-btn.xs { padding: 5px 10px; font-size: 11px; border-radius: 8px; }
 .glass-btn.full-width { width: 100%; justify-content: center; }
 
@@ -206,7 +201,6 @@ body {
     touch-action: none;
 }
 
-/* 悬浮缩放控制胶囊 */
 .floating-zoom-controls {
     position: absolute; top: 12px; right: 12px; z-index: 80;
     display: flex; align-items: center; padding: 2px 6px; font-size: 12px; font-weight: 600;
@@ -237,7 +231,6 @@ body {
     border: 2px solid white; border-radius: 50%; cursor: nwse-resize; touch-action: none;
 }
 
-/* 上传提示触发区域 */
 .drop-zone-overlay {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     pointer-events: auto; z-index: 10; cursor: pointer;
@@ -280,17 +273,53 @@ input[type="range"] { width: 100%; accent-color: var(--accent-blue); }
 .empty-tip { text-align: center; color: var(--text-secondary); padding: 40px 10px; font-size: 12px; }
 .empty-tip i { font-size: 32px; opacity: 0.3; margin-bottom: 10px; display: block; }
 
+/* 导出格式选择小弹窗样式 */
+.export-modal-card {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    width: 90vw; max-width: 380px; z-index: 1000;
+    border-radius: 24px; padding: 20px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.export-modal-card.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+
+.export-format-options { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.format-card {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s ease;
+}
+.format-card:hover, .format-card.active {
+    background: white; border-color: var(--accent-blue); box-shadow: 0 4px 14px rgba(0, 122, 255, 0.12);
+}
+.format-card-left { display: flex; align-items: center; gap: 12px; }
+.format-card-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(0, 122, 255, 0.1); color: var(--accent-blue);
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.format-card-info h4 { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.format-card-info p { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+.format-radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--text-secondary); }
+.format-card.active .format-radio { border-color: var(--accent-blue); background: var(--accent-blue); }
+
+.modal-footer { margin-top: 10px; }
+
+/* 弹窗遮罩 */
+.modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    z-index: 900; opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+.modal-backdrop.show { opacity: 1; pointer-events: auto; }
+
 /* --- 手机端响应式 --- */
 .mobile-only { display: none !important; }
 .desktop-only { display: inline-flex !important; }
-
-.sidebar-backdrop {
-    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
-    z-index: 900; opacity: 0; pointer-events: none;
-    transition: opacity 0.3s ease;
-}
-.sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
 
 @media (max-width: 768px) {
     .mobile-only { display: inline-flex !important; }
@@ -302,24 +331,28 @@ input[type="range"] { width: 100%; accent-color: var(--accent-blue); }
 
     .main-workspace { padding: 6px 8px 8px 8px; gap: 0; }
 
-    .sidebar {
-        position: fixed; top: 0; bottom: 0; height: 100vh; height: 100dvh;
-        width: 86vw; max-width: 320px; z-index: 1000; border-radius: 0;
-        box-shadow: 0 0 40px rgba(0,0,0,0.15);
+    /* 手机端侧边栏重构为 iOS 悬浮小弹窗 */
+    .sidebar.modal-card {
+        position: fixed; top: 50%; left: 50%;
+        transform: translate(-50%, -50%) scale(0.9);
+        width: 88vw; max-width: 380px; height: auto; max-height: 82vh; max-height: 82dvh;
+        z-index: 1000; border-radius: 24px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
         background: rgba(255, 255, 255, 0.96);
         backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
-        transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    
-    .sidebar-left { left: 0; transform: translate3d(-100%, 0, 0); border-radius: 0 20px 20px 0; }
-    .sidebar-left.show { transform: translate3d(0, 0, 0); }
 
-    .sidebar-right { right: 0; left: auto; transform: translate3d(100%, 0, 0); border-radius: 20px 0 0 20px; }
-    .sidebar-right.show { transform: translate3d(0, 0, 0); }
+    .sidebar.modal-card.show {
+        opacity: 1; pointer-events: auto;
+        transform: translate(-50%, -50%) scale(1);
+    }
 
     .viewport-container { border-radius: 16px; }
 
-    .bottom-dock-wrapper { bottom: 10px; width: calc(100% - 20px); max-width: 380px; }
-    .bottom-dock { justify-content: space-around; padding: 5px 8px; gap: 4px; }
-    .export-btn { padding: 5px 8px; font-size: 11px; gap: 4px; }
+    .bottom-dock-wrapper { bottom: 8px; width: calc(100% - 16px); max-width: 380px; }
+    .bottom-dock { justify-content: space-around; padding: 4px 6px; gap: 3px; }
+    .dock-segment { gap: 3px; }
+    .glass-btn { padding: 5px 8px; font-size: 11px; }
 }

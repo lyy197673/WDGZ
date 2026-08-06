@@ -66,7 +66,8 @@ const state = {
     openFolders: new Set(),
     placedStamps: {},
     selectedStampId: null,
-    nextStampId: 1
+    nextStampId: 1,
+    selectedExportFormat: 'pdf'
 };
 
 // --- DOM 节点 ---
@@ -79,11 +80,17 @@ const dom = {
     btnTriggerDropZone: document.getElementById('btn-trigger-drop-zone'),
     dirStatus: document.getElementById('dir-status'),
     
+    // 弹窗与控制
     sidebarLeft: document.getElementById('sidebar-left'),
     sidebarRight: document.getElementById('sidebar-right'),
-    sidebarBackdrop: document.getElementById('sidebar-backdrop'),
+    modalBackdrop: document.getElementById('modal-backdrop'),
     btnToggleLeftSidebar: document.getElementById('btn-toggle-left-sidebar'),
     btnToggleRightSidebar: document.getElementById('btn-toggle-right-sidebar'),
+
+    // 导出弹窗
+    modalExportFormat: document.getElementById('modal-export-format'),
+    btnOpenExportModal: document.getElementById('btn-open-export-modal'),
+    btnConfirmExport: document.getElementById('btn-confirm-export'),
 
     fileInputDoc: document.getElementById('file-input-doc'),
     stampCategories: document.getElementById('stamp-categories'),
@@ -94,6 +101,9 @@ const dom = {
     
     btnAddTempStamp: document.getElementById('btn-add-temp-stamp'),
     inputTempStamp: document.getElementById('input-temp-stamp'),
+
+    btnResetDoc: document.getElementById('btn-reset-doc'),
+    btnClearStamps: document.getElementById('btn-clear-stamps'),
 
     btnZoomIn: document.getElementById('btn-zoom-in'),
     btnZoomOut: document.getElementById('btn-zoom-out'),
@@ -264,7 +274,7 @@ function renderStampLibraryUI() {
             });
             card.addEventListener('click', () => {
                 addStampToCanvas(stamp);
-                closeMobileDrawers();
+                closeModals(); // 选择印章后自动关闭小弹窗
             });
 
             gridEl.appendChild(card);
@@ -290,32 +300,118 @@ function renderStampLibraryUI() {
     });
 }
 
-// 移动端抽屉面板切换
-function openLeftDrawer() {
+// 弹窗与控制
+function openLeftModal() {
     dom.sidebarLeft.classList.add('show');
-    dom.sidebarBackdrop.classList.add('show');
+    dom.modalBackdrop.classList.add('show');
 }
-function openRightDrawer() {
+function openRightModal() {
     dom.sidebarRight.classList.add('show');
-    dom.sidebarBackdrop.classList.add('show');
+    dom.modalBackdrop.classList.add('show');
 }
-function closeMobileDrawers() {
+function openExportModal() {
+    dom.modalExportFormat.classList.add('show');
+    dom.modalBackdrop.classList.add('show');
+}
+function closeModals() {
     dom.sidebarLeft.classList.remove('show');
     dom.sidebarRight.classList.remove('show');
-    dom.sidebarBackdrop.classList.remove('show');
+    dom.modalExportFormat.classList.remove('show');
+    dom.modalBackdrop.classList.remove('show');
+}
+
+// 重置清空画布文档（换一张）
+function resetDocument() {
+    state.doc = {
+        file: null, type: null, pdfDoc: null,
+        currentPage: 1, totalPages: 1,
+        originalWidth: 0, originalHeight: 0
+    };
+    state.placedStamps = {};
+    deselectStamp();
+
+    const ctx = dom.docCanvas.getContext('2d');
+    ctx.clearRect(0, 0, dom.docCanvas.width, dom.docCanvas.height);
+    dom.docCanvas.width = 0;
+    dom.docCanvas.height = 0;
+    dom.stampLayer.innerHTML = '';
+
+    dom.pageControls.style.display = 'none';
+    dom.dropZone.classList.remove('hidden');
+    dom.fileInputDoc.value = '';
+}
+
+// 清除当前页面上的所有印章
+function clearCurrentPageStamps() {
+    state.placedStamps[state.doc.currentPage] = [];
+    deselectStamp();
+    renderStampsForCurrentPage();
+}
+
+// 自动动态构造文件名：生成日期_原文件名_盖章名称.后缀
+function generateExportFilename(extension) {
+    // 1. 生成日期 YYYYMMDD
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+
+    // 2. 原文件名 (去除文件扩展名)
+    let rawFileName = '文档';
+    if (state.doc.file && state.doc.file.name) {
+        rawFileName = state.doc.file.name.replace(/\.[^/.]+$/, "");
+    }
+
+    // 3. 收集并去重所有已盖印章的名称
+    const usedStampNames = [];
+    Object.values(state.placedStamps).forEach(pageStamps => {
+        pageStamps.forEach(stamp => {
+            if (stamp.name && !usedStampNames.includes(stamp.name)) {
+                usedStampNames.push(stamp.name);
+            }
+        });
+    });
+
+    const stampsStr = usedStampNames.length > 0 ? usedStampNames.join('_') : '已盖章';
+
+    return `${dateStr}_${rawFileName}_${stampsStr}.${extension}`;
 }
 
 // --- 事件绑定 ---
 function initEvents() {
-    dom.btnToggleLeftSidebar?.addEventListener('click', openLeftDrawer);
-    dom.btnToggleRightSidebar?.addEventListener('click', openRightDrawer);
-    dom.sidebarBackdrop?.addEventListener('click', closeMobileDrawers);
-    document.querySelectorAll('.btn-close-drawer').forEach(btn => btn.addEventListener('click', closeMobileDrawers));
+    // 弹窗切换触发
+    dom.btnToggleLeftSidebar?.addEventListener('click', openLeftModal);
+    dom.btnToggleRightSidebar?.addEventListener('click', openRightModal);
+    dom.btnOpenExportModal?.addEventListener('click', openExportModal);
+    
+    dom.modalBackdrop?.addEventListener('click', closeModals);
+    document.querySelectorAll('.btn-close-modal, .btn-close-export-modal').forEach(btn => btn.addEventListener('click', closeModals));
+
+    // 导出卡片选择
+    document.querySelectorAll('.format-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            document.querySelectorAll('.format-card').forEach(c => c.classList.remove('active'));
+            const target = e.currentTarget;
+            target.classList.add('active');
+            state.selectedExportFormat = target.getAttribute('data-format');
+        });
+    });
+
+    // 确认导出
+    dom.btnConfirmExport.addEventListener('click', () => {
+        exportDocument(state.selectedExportFormat);
+        closeModals();
+    });
 
     dom.btnChangeDir.addEventListener('click', selectAndSaveNewDirectory);
 
-    // 点击中间卡片/覆盖层直接选择文档文件
-    dom.dropZone.addEventListener('click', () => dom.fileInputDoc.click());
+    // 单击中央卡片直接选择文档
+    dom.btnTriggerDropZone.addEventListener('click', () => dom.fileInputDoc.click());
+
+    // “换一张”与“清除印章”
+    dom.btnResetDoc.addEventListener('click', resetDocument);
+    dom.btnClearStamps.addEventListener('click', clearCurrentPageStamps);
 
     // 临时上传单个印章
     dom.btnAddTempStamp.addEventListener('click', () => dom.inputTempStamp.click());
@@ -336,7 +432,7 @@ function initEvents() {
             renderStampLibraryUI();
 
             addStampToCanvas(tempStamp);
-            closeMobileDrawers();
+            closeModals();
             e.target.value = '';
         }
     });
@@ -374,7 +470,7 @@ function initEvents() {
         });
     });
 
-    // 画布平移 (Mouse & Touch 统一控制)
+    // 画布平移 (Mouse & Touch)
     const startPan = (e) => {
         if (e.target === dom.viewport || e.target === dom.docCanvas || e.target === dom.stampLayer) {
             state.isPanning = true;
@@ -435,13 +531,6 @@ function initEvents() {
     dom.btnRotMinus90.addEventListener('click', () => adjustRotation(-90));
     dom.btnRot0.addEventListener('click', () => updateSelectedStamp({ rotation: 0 }));
     dom.btnRot90.addEventListener('click', () => adjustRotation(90));
-
-    document.querySelectorAll('.export-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const format = e.currentTarget.getAttribute('data-type');
-            exportDocument(format);
-        });
-    });
 }
 
 // --- 加载与绘制文档 ---
@@ -550,6 +639,7 @@ function addStampToCanvas(stampData, targetX, targetY) {
         const stampInst = {
             id: state.nextStampId++,
             pageNum: state.doc.currentPage,
+            name: stampData.name || '印章',
             imgObj: img,
             url: stampData.url,
             x, y,
@@ -829,8 +919,9 @@ async function renderHighResPageCanvas(pageNum) {
 
 async function exportAsImage(format) {
     const canvas = await renderHighResPageCanvas(state.doc.currentPage);
+    const filename = generateExportFilename(format);
     const link = document.createElement('a');
-    link.download = `盖章文档_第${state.doc.currentPage}页.${format}`;
+    link.download = filename;
     link.href = canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.95);
     link.click();
 }
@@ -853,5 +944,6 @@ async function exportAsPDF() {
         pdfDoc.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
     }
 
-    pdfDoc.save('盖章文档_高清.pdf');
+    const filename = generateExportFilename('pdf');
+    pdfDoc.save(filename);
 }
