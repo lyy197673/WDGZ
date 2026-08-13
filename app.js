@@ -826,33 +826,65 @@ function renderStampsForCurrentPage() {
     });
 }
 
+// 就地给印章元素添加选中样式与旋转/缩放手柄（手势中不重建整层 DOM，
+// 避免手指按住时触摸目标被移除，导致移动端手势被 touchcancel 中断）
+function addSelectionHandles(el, stamp) {
+    if (!el.classList.contains('selected')) el.classList.add('selected');
+    if (!el.querySelector('.stamp-handle-rotate')) {
+        const rh = document.createElement('div');
+        rh.className = 'stamp-handle-rotate';
+        rh.innerHTML = '<i class="fa-solid fa-rotate-right"></i>';
+        bindRotateEvent(rh, stamp);
+        el.appendChild(rh);
+    }
+    if (!el.querySelector('.stamp-handle-resize')) {
+        const rsh = document.createElement('div');
+        rsh.className = 'stamp-handle-resize';
+        bindResizeEvent(rsh, stamp);
+        el.appendChild(rsh);
+    }
+}
+
 function bindStampMoveEvent(el, stamp) {
     const startMove = (e) => {
         e.stopPropagation();
-        selectStamp(stamp.id);
-
         const coords = getEventCoords(e);
-        let startX = coords.clientX, startY = coords.clientY;
+        const startX = coords.clientX, startY = coords.clientY;
+        const origX = stamp.x, origY = stamp.y;
+
+        // 选中印章但只就地更新视觉，不重建整层 DOM
+        if (state.selectedStampId !== stamp.id) {
+            state.selectedStampId = stamp.id;
+            addSelectionHandles(el, stamp);
+            updatePropUI();
+        }
 
         const onMove = (moveEvent) => {
-            const currentCoords = getEventCoords(moveEvent);
-            stamp.x += (currentCoords.clientX - startX) / state.zoom;
-            stamp.y += (currentCoords.clientY - startY) / state.zoom;
-            startX = currentCoords.clientX; startY = currentCoords.clientY;
-            renderStampsForCurrentPage();
+            const c = getEventCoords(moveEvent);
+            stamp.x = origX + (c.clientX - startX) / state.zoom;
+            stamp.y = origY + (c.clientY - startY) / state.zoom;
+            el.style.left = stamp.x + 'px';
+            el.style.top = stamp.y + 'px';
         };
 
         const onEnd = () => {
+            cleanup();
+            renderStampsForCurrentPage();
+            updatePropUI();
+        };
+        const cleanup = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onEnd);
             window.removeEventListener('touchmove', onMove);
             window.removeEventListener('touchend', onEnd);
+            window.removeEventListener('touchcancel', onEnd);
         };
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onEnd);
         window.addEventListener('touchmove', onMove, { passive: true });
         window.addEventListener('touchend', onEnd);
+        window.addEventListener('touchcancel', onEnd);
     };
 
     el.addEventListener('mousedown', startMove);
@@ -865,27 +897,35 @@ function bindRotateEvent(handleEl, stamp) {
         const rect = dom.stampLayer.getBoundingClientRect();
         const cx = rect.left + (stamp.x + stamp.width / 2) * state.zoom;
         const cy = rect.top + (stamp.y + stamp.height / 2) * state.zoom;
+        const el = handleEl.closest('.placed-stamp');
 
         const onMove = (moveEvent) => {
             const coords = getEventCoords(moveEvent);
             let angle = Math.round(Math.atan2(coords.clientY - cy, coords.clientX - cx) * (180 / Math.PI)) + 90;
             if (angle > 180) angle -= 360;
             stamp.rotation = angle;
+            if (el) el.style.transform = `rotate(${angle}deg)`;
             updatePropUI();
-            renderStampsForCurrentPage();
         };
 
         const onEnd = () => {
+            cleanup();
+            renderStampsForCurrentPage();
+            updatePropUI();
+        };
+        const cleanup = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onEnd);
             window.removeEventListener('touchmove', onMove);
             window.removeEventListener('touchend', onEnd);
+            window.removeEventListener('touchcancel', onEnd);
         };
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onEnd);
         window.addEventListener('touchmove', onMove, { passive: true });
         window.addEventListener('touchend', onEnd);
+        window.addEventListener('touchcancel', onEnd);
     };
 
     handleEl.addEventListener('mousedown', startRotate);
@@ -896,30 +936,41 @@ function bindResizeEvent(handleEl, stamp) {
     const startResize = (e) => {
         e.stopPropagation();
         const coords = getEventCoords(e);
-        let startX = coords.clientX;
+        const startX = coords.clientX;
         const ratio = stamp.width / stamp.height;
+        const origWidth = stamp.width;
+        const el = handleEl.closest('.placed-stamp');
 
         const onMove = (moveEvent) => {
-            const currentCoords = getEventCoords(moveEvent);
-            const dx = (currentCoords.clientX - startX) / state.zoom;
-            stamp.width = Math.max(30, stamp.width + dx);
+            const c = getEventCoords(moveEvent);
+            const dx = (c.clientX - startX) / state.zoom;
+            stamp.width = Math.max(30, origWidth + dx);
             stamp.height = stamp.width / ratio;
-            startX = currentCoords.clientX;
+            if (el) {
+                el.style.width = stamp.width + 'px';
+                el.style.height = stamp.height + 'px';
+            }
             updatePropUI();
-            renderStampsForCurrentPage();
         };
 
         const onEnd = () => {
+            cleanup();
+            renderStampsForCurrentPage();
+            updatePropUI();
+        };
+        const cleanup = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onEnd);
             window.removeEventListener('touchmove', onMove);
             window.removeEventListener('touchend', onEnd);
+            window.removeEventListener('touchcancel', onEnd);
         };
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onEnd);
         window.addEventListener('touchmove', onMove, { passive: true });
         window.addEventListener('touchend', onEnd);
+        window.addEventListener('touchcancel', onEnd);
     };
 
     handleEl.addEventListener('mousedown', startResize);

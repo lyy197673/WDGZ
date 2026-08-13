@@ -407,6 +407,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent-blue); }
 
     .viewport-container { border-radius: 16px; }
 
+    /* 手机端放大旋转/缩放手柄，便于手指点按 */
+    .stamp-handle-rotate { width: 30px; height: 30px; font-size: 12px; top: -34px; }
+    .stamp-handle-resize { width: 24px; height: 24px; right: -8px; bottom: -8px; }
+
     .bottom-dock-wrapper { bottom: 8px; width: calc(100% - 16px); max-width: 380px; }
     .bottom-dock { justify-content: space-around; padding: 4px 6px; gap: 3px; }
     .dock-segment { gap: 3px; }
