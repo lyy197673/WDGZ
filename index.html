@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>在线文档盖章</title>
+    <!-- 夜间模式主题提前注入，避免首屏闪烁 -->
+    <script>
+        (function () {
+            try {
+                var saved = localStorage.getItem('stampmaster-theme');
+                var theme = saved === 'dark' ? 'dark'
+                    : saved === 'light' ? 'light'
+                    : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {}
+        })();
+    </script>
     <!-- 图标库 FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- PDF.js 渲染库 -->
@@ -109,10 +121,16 @@
                 </button>
             </div>
 
-            <div class="toolbar-right desktop-only">
-                <div id="dir-status" class="status-badge">
+            <div class="toolbar-right">
+                <div id="dir-status" class="status-badge desktop-only">
                     <i class="fa-solid fa-arrows-rotate fa-spin"></i> 读取印章中...
                 </div>
+                <button id="btn-help" class="icon-btn" title="使用说明">
+                    <i class="fa-solid fa-circle-question"></i>
+                </button>
+                <button id="btn-toggle-theme" class="icon-btn" title="切换夜间模式">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
             </div>
         </header>
 
@@ -261,6 +279,72 @@
                 </div>
             </aside>
         </main>
+    </div>
+
+    <!-- 开屏使用说明弹窗 -->
+    <div class="onboard-overlay" id="onboard-overlay">
+        <div class="onboard-card glass-panel">
+            <div class="onboard-header">
+                <div class="onboard-logo"><i class="fa-solid fa-stamp"></i></div>
+                <h2>欢迎使用 · 在线文档盖章</h2>
+                <p>几步轻松完成文档盖章</p>
+            </div>
+
+            <div class="onboard-body">
+                <ol class="onboard-steps">
+                    <li class="onboard-step">
+                        <span class="step-num">1</span>
+                        <div class="step-text">
+                            <strong>上传文档</strong>
+                            <p>单击或拖拽文件到画布中央区域，支持 PNG、JPG、WEBP、PDF 格式。</p>
+                        </div>
+                    </li>
+                    <li class="onboard-step">
+                        <span class="step-num">2</span>
+                        <div class="step-text">
+                            <strong>准备印章</strong>
+                            <p>点击左上角「印章库」选择/更换印章目录；或点「临时上传单个印章」添加透明 PNG 印章。</p>
+                        </div>
+                    </li>
+                    <li class="onboard-step">
+                        <span class="step-num">3</span>
+                        <div class="step-text">
+                            <strong>放置印章</strong>
+                            <p>单击印章库中的印章即可放到文档中央，也可直接拖拽到任意盖章位置。</p>
+                        </div>
+                    </li>
+                    <li class="onboard-step">
+                        <span class="step-num">4</span>
+                        <div class="step-text">
+                            <strong>微调印章</strong>
+                            <p>点击画布中的印章，在右侧「微调」面板调整大小、旋转角度、透明度与融合模式，还原真实盖章效果。</p>
+                        </div>
+                    </li>
+                    <li class="onboard-step">
+                        <span class="step-num">5</span>
+                        <div class="step-text">
+                            <strong>多页盖章</strong>
+                            <p>多页 PDF 可通过底部页码按钮切换页面，在每一页独立盖章。</p>
+                        </div>
+                    </li>
+                    <li class="onboard-step">
+                        <span class="step-num">6</span>
+                        <div class="step-text">
+                            <strong>导出文档</strong>
+                            <p>点击底部「导出文档」，选择 PDF 高清（推荐）、PNG 或 JPG，支持自定义文件名。</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="onboard-footer">
+                <label class="onboard-checkbox">
+                    <input type="checkbox" id="onboard-dont-again">
+                    <span>下次启动不再提醒</span>
+                </label>
+                <button id="btn-onboard-start" class="glass-btn primary">开始使用</button>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>

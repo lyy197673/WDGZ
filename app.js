@@ -54,6 +54,42 @@ function showToast(message) {
     }, 2500);
 }
 
+// --- 夜间模式切换 ---
+const THEME_STORAGE_KEY = 'stampmaster-theme';
+const ONBOARD_STORAGE_KEY = 'stampmaster-onboard';
+
+function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+
+function updateThemeButtonIcon() {
+    const isDark = currentTheme() === 'dark';
+    if (!dom.btnToggleTheme) return;
+    dom.btnToggleTheme.innerHTML = isDark ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
+    dom.btnToggleTheme.title = isDark ? '切换到日间模式' : '切换到夜间模式';
+}
+
+function toggleTheme() {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch (e) {}
+    updateThemeButtonIcon();
+    showToast(next === 'dark' ? '已开启夜间模式 🌙' : '已切换为日间模式 ☀️');
+}
+
+// --- 开屏使用说明弹窗 ---
+function shouldShowOnboard() {
+    try { return localStorage.getItem(ONBOARD_STORAGE_KEY) !== '1'; } catch (e) { return true; }
+}
+
+function showOnboard() {
+    dom.onboardOverlay.classList.add('show');
+}
+
+function hideOnboard() {
+    dom.onboardOverlay.classList.remove('show');
+}
+
 // --- 全局状态 ---
 const state = {
     zoom: 1.0,
@@ -146,7 +182,14 @@ const dom = {
     btnDeleteStamp: document.getElementById('btn-delete-stamp'),
     btnRotMinus90: document.getElementById('btn-rot--90'),
     btnRot0: document.getElementById('btn-rot-0'),
-    btnRot90: document.getElementById('btn-rot-90')
+    btnRot90: document.getElementById('btn-rot-90'),
+
+    // 夜间模式 & 开屏说明
+    btnToggleTheme: document.getElementById('btn-toggle-theme'),
+    btnHelp: document.getElementById('btn-help'),
+    onboardOverlay: document.getElementById('onboard-overlay'),
+    onboardDontAgain: document.getElementById('onboard-dont-again'),
+    btnOnboardStart: document.getElementById('btn-onboard-start')
 };
 
 // --- 初始化程序 ---
@@ -596,6 +639,29 @@ function initEvents() {
     dom.btnRotMinus90.addEventListener('click', () => adjustRotation(-90));
     dom.btnRot0.addEventListener('click', () => updateSelectedStamp({ rotation: 0 }));
     dom.btnRot90.addEventListener('click', () => adjustRotation(90));
+
+    // 夜间模式切换按钮
+    dom.btnToggleTheme?.addEventListener('click', toggleTheme);
+    updateThemeButtonIcon();
+
+    // 开屏使用说明弹窗
+    dom.btnHelp?.addEventListener('click', showOnboard);
+    dom.btnOnboardStart?.addEventListener('click', () => {
+        if (dom.onboardDontAgain.checked) {
+            try { localStorage.setItem(ONBOARD_STORAGE_KEY, '1'); } catch (e) {}
+        }
+        hideOnboard();
+    });
+
+    // 点击遮罩空白处关闭开屏弹窗
+    dom.onboardOverlay?.addEventListener('click', (e) => {
+        if (e.target === dom.onboardOverlay) hideOnboard();
+    });
+
+    // 首次进入且未勾选“不再提醒”时，延时弹出使用说明
+    if (shouldShowOnboard()) {
+        setTimeout(showOnboard, 600);
+    }
 }
 
 // --- 加载与绘制文档 ---
