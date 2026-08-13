@@ -35,9 +35,6 @@
     <!-- 顶层 Toast 消息提示框 -->
     <div id="toast-message" class="toast-message glass-pill"></div>
 
-    <!-- 通用弹窗遮罩层 -->
-    <div class="modal-backdrop" id="modal-backdrop"></div>
-
     <!-- 导出格式与自定义文件名选择小弹窗 -->
     <div class="export-modal-card glass-panel" id="modal-export-format">
         <div class="sidebar-header">
@@ -100,6 +97,9 @@
     </div>
 
     <div class="app-container">
+        <!-- 通用弹窗遮罩层（置于应用容器内，与手机端侧边栏同堆叠上下文，避免遮罩盖住弹窗） -->
+        <div class="modal-backdrop" id="modal-backdrop"></div>
+
         <!-- 顶部高斯玻璃导航栏 -->
         <header class="top-bar glass-panel">
             <div class="brand">
