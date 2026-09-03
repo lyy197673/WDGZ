@@ -54,6 +54,40 @@ function showToast(message) {
     }, 2500);
 }
 
+// 颜色叠加离屏 Canvas 发生器
+function createColorOverlayCanvas(imgObj, color) {
+    const off = document.createElement('canvas');
+    off.width = imgObj.naturalWidth || imgObj.width;
+    off.height = imgObj.naturalHeight || imgObj.height;
+    const offCtx = off.getContext('2d');
+
+    // 绘制原印章透明轮廓
+    offCtx.drawImage(imgObj, 0, 0);
+
+    // 锁定 alpha 通道染色
+    offCtx.globalCompositeOperation = 'source-in';
+    offCtx.fillStyle = color;
+    offCtx.fillRect(0, 0, off.width, off.height);
+
+    return off;
+}
+
+// 获取滤镜在 Canvas 导出时所用的滤镜表达式
+function getCanvasFilterString(filterType) {
+    switch (filterType) {
+        case 'grayscale':
+            return 'grayscale(100%) contrast(120%)';
+        case 'aging':
+            return 'contrast(130%) brightness(85%) sepia(25%)';
+        case 'vintage-warm':
+            return 'sepia(45%) saturate(140%) contrast(105%)';
+        case 'high-contrast':
+            return 'contrast(180%) saturate(120%)';
+        default:
+            return 'none';
+    }
+}
+
 // --- 夜间模式切换 ---
 const THEME_STORAGE_KEY = 'stampmaster-theme';
 const ONBOARD_STORAGE_KEY = 'stampmaster-onboard';
@@ -184,6 +218,13 @@ const dom = {
     btnRot0: document.getElementById('btn-rot-0'),
     btnRot90: document.getElementById('btn-rot-90'),
 
+    // 印章滤镜与调色
+    propFilter: document.getElementById('prop-filter'),
+    propColorEnable: document.getElementById('prop-color-enable'),
+    colorPaletteBox: document.getElementById('color-palette-box'),
+    propCustomColor: document.getElementById('prop-custom-color'),
+    colorDots: document.querySelectorAll('.color-dot'),
+
     // 夜间模式 & 开屏说明
     btnToggleTheme: document.getElementById('btn-toggle-theme'),
     btnHelp: document.getElementById('btn-help'),
@@ -276,7 +317,7 @@ async function scanDirectoryHandle(dirHandle, currentPath) {
     }
 }
 
-// 渲染可折叠印章库 UI 列表
+// 渲染印章库
 function renderStampLibraryUI() {
     const query = dom.stampSearch.value.trim().toLowerCase();
     dom.stampCategories.innerHTML = '';
@@ -336,7 +377,7 @@ function renderStampLibraryUI() {
             });
             card.addEventListener('click', () => {
                 addStampToCanvas(stamp);
-                closeModals(); // 选择印章后自动关闭小弹窗
+                closeModals();
             });
 
             gridEl.appendChild(card);
@@ -362,9 +403,9 @@ function renderStampLibraryUI() {
     });
 }
 
-// 弹窗与控制
+// 弹窗逻辑
 function openLeftModal() {
-  dom.sidebarLeft.classList.add('show');
+    dom.sidebarLeft.classList.add('show');
     dom.modalBackdrop.classList.add('show');
 }
 function openRightModal() {
@@ -372,7 +413,6 @@ function openRightModal() {
     dom.modalBackdrop.classList.add('show');
 }
 function openExportModal() {
-    // 预填推荐的提示占位符
     if (dom.inputCustomFilename) {
         dom.inputCustomFilename.placeholder = `请输入导出文件名，默认使用原文件名`;
     }
@@ -386,7 +426,7 @@ function closeModals() {
     dom.modalBackdrop.classList.remove('show');
 }
 
-// 重置清空画布文档（换一张）
+// 重置清空画布文档
 function resetDocument() {
     state.doc = {
         file: null, type: null, pdfDoc: null,
@@ -407,14 +447,13 @@ function resetDocument() {
     dom.fileInputDoc.value = '';
 }
 
-// 清除当前页面上的所有印章
+// 清除当前页面印章
 function clearCurrentPageStamps() {
     state.placedStamps[state.doc.currentPage] = [];
     deselectStamp();
     renderStampsForCurrentPage();
 }
 
-// 默认推荐的基础文件名公式
 function generateDefaultBaseFilename() {
     const now = new Date();
     const year = now.getFullYear();
@@ -440,7 +479,6 @@ function generateDefaultBaseFilename() {
     return `${dateStr}_${rawFileName}_${stampsStr}`;
 }
 
-// 拼接最终导出的完整文件名
 function generateExportFilename(extension) {
     const customName = dom.inputCustomFilename ? dom.inputCustomFilename.value.trim() : '';
     if (customName) {
@@ -455,7 +493,6 @@ function initEvents() {
     dom.btnToggleLeftSidebar?.addEventListener('click', openLeftModal);
     dom.btnToggleRightSidebar?.addEventListener('click', openRightModal);
     
-    // 导出前先检测画布是否有内容
     dom.btnOpenExportModal?.addEventListener('click', () => {
         if (!state.doc.file || !state.doc.originalWidth) {
             showToast('当前画布暂无内容，请先上传文档！');
@@ -467,7 +504,7 @@ function initEvents() {
     dom.modalBackdrop?.addEventListener('click', closeModals);
     document.querySelectorAll('.btn-close-modal, .btn-close-export-modal').forEach(btn => btn.addEventListener('click', closeModals));
 
-    // 导出格式卡片选择
+    // 导出格式切换
     document.querySelectorAll('.format-card').forEach(card => {
         card.addEventListener('click', (e) => {
             document.querySelectorAll('.format-card').forEach(c => c.classList.remove('active'));
@@ -484,15 +521,12 @@ function initEvents() {
     });
 
     dom.btnChangeDir.addEventListener('click', selectAndSaveNewDirectory);
-
-    // 单击中央卡片直接选择文档
     dom.btnTriggerDropZone.addEventListener('click', () => dom.fileInputDoc.click());
 
-    // “换一张”与“清除印章”
     dom.btnResetDoc.addEventListener('click', resetDocument);
     dom.btnClearStamps.addEventListener('click', clearCurrentPageStamps);
 
-    // 临时上传单个印章
+    // 临时上传印章
     dom.btnAddTempStamp.addEventListener('click', () => dom.inputTempStamp.click());
     dom.inputTempStamp.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -549,10 +583,9 @@ function initEvents() {
         });
     });
 
-    // 画布平移与双指捏合（Pinch-to-Zoom）手势控制
+    // 平移与缩放手势
     const handlePanOrPinchStart = (e) => {
         if (e.touches && e.touches.length === 2) {
-            // 双指捏合手势开始
             state.isPanning = false;
             touchZoomState.isPinching = true;
             touchZoomState.initialDist = Math.hypot(
@@ -561,7 +594,6 @@ function initEvents() {
             );
             touchZoomState.initialZoom = state.zoom;
         } else if (e.target === dom.viewport || e.target === dom.docCanvas || e.target === dom.stampLayer) {
-            // 单指/鼠标平移
             touchZoomState.isPinching = false;
             state.isPanning = true;
             const coords = getEventCoords(e);
@@ -573,7 +605,6 @@ function initEvents() {
 
     const handlePanOrPinchMove = (e) => {
         if (touchZoomState.isPinching && e.touches && e.touches.length === 2) {
-            // 双指捏合实时计算缩放倍率
             const currentDist = Math.hypot(
                 e.touches[0].clientX - e.touches[1].clientX,
                 e.touches[0].clientY - e.touches[1].clientY
@@ -583,7 +614,6 @@ function initEvents() {
                 setZoom(touchZoomState.initialZoom * factor);
             }
         } else if (state.isPanning) {
-            // 单指/鼠标平移
             const coords = getEventCoords(e);
             state.panX = coords.clientX - state.startPanX;
             state.panY = coords.clientY - state.startPanY;
@@ -620,6 +650,7 @@ function initEvents() {
     dom.btnPrevPage.addEventListener('click', () => switchPage(state.doc.currentPage - 1));
     dom.btnNextPage.addEventListener('click', () => switchPage(state.doc.currentPage + 1));
 
+    // 属性面板调整
     dom.propScale.addEventListener('input', (e) => {
         updateSelectedStamp({ scale: parseFloat(e.target.value) / 100 });
         dom.propScaleVal.textContent = e.target.value + '%';
@@ -640,11 +671,42 @@ function initEvents() {
     dom.btnRot0.addEventListener('click', () => updateSelectedStamp({ rotation: 0 }));
     dom.btnRot90.addEventListener('click', () => adjustRotation(90));
 
-    // 夜间模式切换按钮
+    // 滤镜切换
+    dom.propFilter?.addEventListener('change', (e) => {
+        updateSelectedStamp({ filterType: e.target.value });
+    });
+
+    // 启用/关闭颜色叠加
+    dom.propColorEnable?.addEventListener('change', (e) => {
+        const enabled = e.target.checked;
+        updateSelectedStamp({ colorOverlayEnabled: enabled });
+        dom.colorPaletteBox.style.opacity = enabled ? '1' : '0.5';
+        dom.colorPaletteBox.style.pointerEvents = enabled ? 'auto' : 'none';
+    });
+
+    // 预设色块快速选择
+    dom.colorDots?.forEach(dot => {
+        dot.addEventListener('click', (e) => {
+            const color = e.currentTarget.getAttribute('data-color');
+            dom.colorDots.forEach(d => d.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            dom.propCustomColor.value = color;
+            updateSelectedStamp({ overlayColor: color });
+        });
+    });
+
+    // 自定义颜色拾取
+    dom.propCustomColor?.addEventListener('input', (e) => {
+        const color = e.target.value;
+        dom.colorDots.forEach(d => d.classList.remove('active'));
+        updateSelectedStamp({ overlayColor: color });
+    });
+
+    // 夜间模式切换
     dom.btnToggleTheme?.addEventListener('click', toggleTheme);
     updateThemeButtonIcon();
 
-    // 开屏使用说明弹窗
+    // 开屏使用说明
     dom.btnHelp?.addEventListener('click', showOnboard);
     dom.btnOnboardStart?.addEventListener('click', () => {
         if (dom.onboardDontAgain.checked) {
@@ -653,12 +715,10 @@ function initEvents() {
         hideOnboard();
     });
 
-    // 点击遮罩空白处关闭开屏弹窗
     dom.onboardOverlay?.addEventListener('click', (e) => {
         if (e.target === dom.onboardOverlay) hideOnboard();
     });
 
-    // 首次进入且未勾选“不再提醒”时，延时弹出使用说明
     if (shouldShowOnboard()) {
         setTimeout(showOnboard, 600);
     }
@@ -778,7 +838,10 @@ function addStampToCanvas(stampData, targetX, targetY) {
             height: defaultHeight,
             rotation: 0,
             opacity: 1.0,
-            blendMode: 'multiply'
+            blendMode: 'multiply',
+            filterType: 'none',
+            colorOverlayEnabled: false,
+            overlayColor: '#d32f2f'
         };
 
         if (!state.placedStamps[state.doc.currentPage]) {
@@ -797,7 +860,8 @@ function renderStampsForCurrentPage() {
 
     currentList.forEach(stamp => {
         const el = document.createElement('div');
-        el.className = `placed-stamp ${stamp.id === state.selectedStampId ? 'selected' : ''}`;
+        const filterClass = stamp.filterType && stamp.filterType !== 'none' ? `filter-${stamp.filterType}` : '';
+        el.className = `placed-stamp ${stamp.id === state.selectedStampId ? 'selected' : ''} ${filterClass}`.trim();
         el.style.left = stamp.x + 'px';
         el.style.top = stamp.y + 'px';
         el.style.width = stamp.width + 'px';
@@ -806,7 +870,13 @@ function renderStampsForCurrentPage() {
         el.style.opacity = stamp.opacity;
         el.style.mixBlendMode = stamp.blendMode;
 
-        el.innerHTML = `<img src="${stamp.url}">`;
+        let displaySrc = stamp.url;
+        if (stamp.colorOverlayEnabled && stamp.imgObj) {
+            const coloredCanvas = createColorOverlayCanvas(stamp.imgObj, stamp.overlayColor);
+            displaySrc = coloredCanvas.toDataURL();
+        }
+
+        el.innerHTML = `<img src="${displaySrc}">`;
 
         if (stamp.id === state.selectedStampId) {
             const rotateHandle = document.createElement('div');
@@ -826,8 +896,6 @@ function renderStampsForCurrentPage() {
     });
 }
 
-// 就地给印章元素添加选中样式与旋转/缩放手柄（手势中不重建整层 DOM，
-// 避免手指按住时触摸目标被移除，导致移动端手势被 touchcancel 中断）
 function addSelectionHandles(el, stamp) {
     if (!el.classList.contains('selected')) el.classList.add('selected');
     if (!el.querySelector('.stamp-handle-rotate')) {
@@ -852,7 +920,6 @@ function bindStampMoveEvent(el, stamp) {
         const startX = coords.clientX, startY = coords.clientY;
         const origX = stamp.x, origY = stamp.y;
 
-        // 选中印章但只就地更新视觉，不重建整层 DOM
         if (state.selectedStampId !== stamp.id) {
             state.selectedStampId = stamp.id;
             addSelectionHandles(el, stamp);
@@ -1034,6 +1101,29 @@ function updatePropUI() {
     dom.propOpacity.value = Math.round(stamp.opacity * 100);
     dom.propOpacityVal.textContent = dom.propOpacity.value + '%';
     dom.propBlend.value = stamp.blendMode;
+
+    // 同步滤镜
+    if (dom.propFilter) {
+        dom.propFilter.value = stamp.filterType || 'none';
+    }
+
+    // 同步颜色叠加
+    if (dom.propColorEnable) {
+        dom.propColorEnable.checked = !!stamp.colorOverlayEnabled;
+        dom.colorPaletteBox.style.opacity = stamp.colorOverlayEnabled ? '1' : '0.5';
+        dom.colorPaletteBox.style.pointerEvents = stamp.colorOverlayEnabled ? 'auto' : 'none';
+        
+        const currentColor = stamp.overlayColor || '#d32f2f';
+        dom.propCustomColor.value = currentColor;
+
+        dom.colorDots.forEach(dot => {
+            if (dot.getAttribute('data-color').toLowerCase() === currentColor.toLowerCase()) {
+                dot.classList.add('active');
+            } else {
+                dot.classList.remove('active');
+            }
+        });
+    }
 }
 
 // --- 缩放与视图 ---
@@ -1087,12 +1177,24 @@ async function renderHighResPageCanvas(pageNum) {
         ctx.globalAlpha = stamp.opacity;
         ctx.globalCompositeOperation = stamp.blendMode;
 
+        // 设置 Canvas 滤镜效果
+        const filterStr = getCanvasFilterString(stamp.filterType);
+        if (filterStr !== 'none') {
+            ctx.filter = filterStr;
+        }
+
         const cx = stamp.x + stamp.width / 2;
         const cy = stamp.y + stamp.height / 2;
         ctx.translate(cx, cy);
         ctx.rotate((stamp.rotation * Math.PI) / 180);
 
-        ctx.drawImage(stamp.imgObj, -stamp.width / 2, -stamp.height / 2, stamp.width, stamp.height);
+        // 如果开启了颜色叠加，导出时使用染色后的离屏画布
+        let renderTarget = stamp.imgObj;
+        if (stamp.colorOverlayEnabled && stamp.imgObj) {
+            renderTarget = createColorOverlayCanvas(stamp.imgObj, stamp.overlayColor);
+        }
+
+        ctx.drawImage(renderTarget, -stamp.width / 2, -stamp.height / 2, stamp.width, stamp.height);
         ctx.restore();
     }
 

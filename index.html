@@ -43,7 +43,6 @@
         </div>
 
         <div class="export-modal-body">
-            <!-- 新增：自定义文件名输入框 -->
             <div class="custom-filename-wrapper">
                 <label for="input-custom-filename"><i class="fa-solid fa-pen-to-square"></i> 导出文件名 (可选)</label>
                 <div class="glass-input-wrapper custom-name-input">
@@ -97,7 +96,7 @@
     </div>
 
     <div class="app-container">
-        <!-- 通用弹窗遮罩层（置于应用容器内，与手机端侧边栏同堆叠上下文，避免遮罩盖住弹窗） -->
+        <!-- 通用弹窗遮罩层 -->
         <div class="modal-backdrop" id="modal-backdrop"></div>
 
         <!-- 顶部高斯玻璃导航栏 -->
@@ -216,7 +215,7 @@
                             <div class="dock-divider"></div>
                         </div>
 
-                        <!-- 合并后的单个导出按钮 -->
+                        <!-- 导出按钮 -->
                         <div class="dock-segment export-segment">
                             <button id="btn-open-export-modal" class="glass-btn primary">
                                 <i class="fa-solid fa-download"></i> 导出文档
@@ -258,6 +257,38 @@
                         <div class="prop-group">
                             <div class="prop-label"><span>透明度</span><span id="prop-opacity-val" class="val-tag">100%</span></div>
                             <input type="range" id="prop-opacity" min="10" max="100" value="100">
+                        </div>
+
+                        <!-- 印章滤镜效果 -->
+                        <div class="prop-group">
+                            <div class="prop-label"><span>印章滤镜效果</span></div>
+                            <select id="prop-filter" class="glass-select">
+                                <option value="none" selected>原图无滤镜</option>
+                                <option value="grayscale">黑白 / 单色灰度</option>
+                                <option value="aging">仿古印泥 (暗沉微噪)</option>
+                                <option value="vintage-warm">复古暖印 (微黄褪色)</option>
+                                <option value="high-contrast">鲜明高对比</option>
+                            </select>
+                        </div>
+
+                        <!-- 自定义颜色叠加 -->
+                        <div class="prop-group">
+                            <div class="prop-label">
+                                <span>印泥颜色叠加</span>
+                                <label class="prop-toggle-label">
+                                    <input type="checkbox" id="prop-color-enable"> 启用
+                                </label>
+                            </div>
+                            <div class="color-palette-wrapper" id="color-palette-box" style="opacity: 0.5; pointer-events: none;">
+                                <div class="color-palette-presets">
+                                    <span class="color-dot active" data-color="#d32f2f" style="background: #d32f2f;" title="经典正红"></span>
+                                    <span class="color-dot" data-color="#b71c1c" style="background: #b71c1c;" title="深朱砂红"></span>
+                                    <span class="color-dot" data-color="#0056b3" style="background: #0056b3;" title="公文蓝"></span>
+                                    <span class="color-dot" data-color="#1c1c1e" style="background: #1c1c1e;" title="纯墨黑"></span>
+                                    <span class="color-dot" data-color="#6a1b9a" style="background: #6a1b9a;" title="印泥紫"></span>
+                                    <input type="color" id="prop-custom-color" value="#d32f2f" class="color-picker-input" title="自定义任意颜色">
+                                </div>
+                            </div>
                         </div>
 
                         <div class="prop-group">
@@ -316,8 +347,8 @@
                     <li class="onboard-step">
                         <span class="step-num">4</span>
                         <div class="step-text">
-                            <strong>微调印章</strong>
-                            <p>点击画布中的印章，在右侧「微调」面板调整大小、旋转角度、透明度与融合模式，还原真实盖章效果。</p>
+                            <strong>微调与效果处理</strong>
+                            <p>点击画布中的印章，在右侧面板不仅能调节缩放、旋转角度、透明度与融合模式，还可以为印章叠加专属印泥颜色或一键切换黑白复印件滤镜。</p>
                         </div>
                     </li>
                     <li class="onboard-step">
