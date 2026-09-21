@@ -140,7 +140,11 @@ const state = {
         currentPage: 1,
         totalPages: 1,
         originalWidth: 0,
-        originalHeight: 0
+        originalHeight: 0,
+        rotation: 0,          // 文档旋转角度（0 / 90 / 180 / 270）
+        imageObj: null,       // 缓存已解码的图片对象，避免旋转时反复解码
+        imageFile: null,      // 图片缓存对应的 File 引用
+        imageObjectUrl: null  // 用于释放 object URL
     },
 
     stampLibrary: [],
@@ -198,6 +202,10 @@ const dom = {
     btnZoomOut: document.getElementById('btn-zoom-out'),
     btnZoomReset: document.getElementById('btn-zoom-reset'),
     zoomLevelText: document.getElementById('zoom-level'),
+
+    // 文档旋转按钮（新增）
+    btnRotateLeft: document.getElementById('btn-rotate-left'),
+    btnRotateRight: document.getElementById('btn-rotate-right'),
 
     pageControls: document.getElementById('page-controls'),
     btnPrevPage: document.getElementById('btn-prev-page'),
@@ -428,10 +436,15 @@ function closeModals() {
 
 // 重置清空画布文档
 function resetDocument() {
+    if (state.doc.imageObjectUrl) {
+        URL.revokeObjectURL(state.doc.imageObjectUrl);
+    }
+
     state.doc = {
         file: null, type: null, pdfDoc: null,
         currentPage: 1, totalPages: 1,
-        originalWidth: 0, originalHeight: 0
+        originalWidth: 0, originalHeight: 0,
+        rotation: 0, imageObj: null, imageFile: null, imageObjectUrl: null
     };
     state.placedStamps = {};
     deselectStamp();
@@ -647,6 +660,10 @@ function initEvents() {
     dom.btnZoomOut.addEventListener('click', () => setZoom(state.zoom / 1.15));
     dom.btnZoomReset.addEventListener('click', resetViewFit);
 
+    // 文档旋转按钮
+    dom.btnRotateLeft?.addEventListener('click', () => rotateDocument('left'));
+    dom.btnRotateRight?.addEventListener('click', () => rotateDocument('right'));
+
     dom.btnPrevPage.addEventListener('click', () => switchPage(state.doc.currentPage - 1));
     dom.btnNextPage.addEventListener('click', () => switchPage(state.doc.currentPage + 1));
 
@@ -726,7 +743,16 @@ function initEvents() {
 
 // --- 加载与绘制文档 ---
 async function loadDocument(file) {
+    // 换新文档前先释放旧图片的 object URL
+    if (state.doc.imageObjectUrl) {
+        URL.revokeObjectURL(state.doc.imageObjectUrl);
+        state.doc.imageObjectUrl = null;
+    }
+
     state.doc.file = file;
+    state.doc.rotation = 0;     // 换新文档时角度归零
+    state.doc.imageObj = null;
+    state.doc.imageFile = null;
     state.placedStamps = {};
     deselectStamp();
 
@@ -752,26 +778,66 @@ async function loadDocument(file) {
 
 function renderImageFile(file) {
     return new Promise((resolve) => {
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-            state.doc.originalWidth = img.width;
-            state.doc.originalHeight = img.height;
-            dom.docCanvas.width = img.width;
-            dom.docCanvas.height = img.height;
-            const ctx = dom.docCanvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-
+        const paint = (img) => {
+            state.doc.imageObj = img;
+            applyImageToDocCanvas(img);
             syncStageSize();
             renderStampsForCurrentPage();
             resolve();
         };
+
+        // 同一 File 复用已解码的图片对象（旋转时走这条分支，不再重新解码）
+        if (state.doc.imageObj && state.doc.imageFile === file) {
+            paint(state.doc.imageObj);
+            return;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            if (state.doc.imageObjectUrl) URL.revokeObjectURL(state.doc.imageObjectUrl);
+            state.doc.imageObjectUrl = objectUrl;
+            state.doc.imageFile = file;
+            paint(img);
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            showToast('图片加载失败，请更换文件');
+            resolve();
+        };
+        img.src = objectUrl;
     });
+}
+
+// 按当前旋转角把图片绘制到 docCanvas 上
+function applyImageToDocCanvas(img) {
+    const rot = normalizeAngle(state.doc.rotation || 0);
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    const swapped = (rot === 90 || rot === 270);
+
+    const cw = swapped ? ih : iw;
+    const ch = swapped ? iw : ih;
+
+    state.doc.originalWidth = cw;
+    state.doc.originalHeight = ch;
+    dom.docCanvas.width = cw;
+    dom.docCanvas.height = ch;
+
+    const ctx = dom.docCanvas.getContext('2d');
+    ctx.save();
+    ctx.translate(cw / 2, ch / 2);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.drawImage(img, -iw / 2, -ih / 2);
+    ctx.restore();
 }
 
 async function renderPDFPage(pageNum) {
     const page = await state.doc.pdfDoc.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 });
+    // pdf.js 会把 rotation 合并计算，90/270 时自动交换宽高
+    const rotation = normalizeAngle((page.rotate || 0) + (state.doc.rotation || 0));
+    const viewport = page.getViewport({ scale: 2.0, rotation });
+
     state.doc.originalWidth = viewport.width;
     state.doc.originalHeight = viewport.height;
     dom.docCanvas.width = viewport.width;
@@ -797,6 +863,62 @@ function switchPage(pageNum) {
     state.doc.currentPage = pageNum;
     deselectStamp();
     renderPDFPage(pageNum);
+}
+
+// --- 文档旋转 ---
+function normalizeAngle(deg) {
+    return ((deg % 360) + 360) % 360;
+}
+
+function normalizeStampRotation(deg) {
+    const r = normalizeAngle(deg);
+    return r > 180 ? r - 360 : r;   // 保持在 (-180, 180]，与滑杆范围一致
+}
+
+async function rotateDocument(direction) {
+    if (!state.doc.file || !state.doc.originalWidth) {
+        showToast('请先上传文档后再旋转');
+        return;
+    }
+
+    const delta = direction === 'left' ? -90 : 90;
+    const oldW = state.doc.originalWidth;
+    const oldH = state.doc.originalHeight;
+
+    // 已放置的印章跟随文档做同样的旋转变换
+    Object.keys(state.placedStamps).forEach(pageKey => {
+        (state.placedStamps[pageKey] || []).forEach(stamp => {
+            const cx = stamp.x + stamp.width / 2;
+            const cy = stamp.y + stamp.height / 2;
+
+            let ncx, ncy;
+            if (delta === 90) {
+                // 顺时针：(x, y) -> (oldH - y, x)
+                ncx = oldH - cy;
+                ncy = cx;
+            } else {
+                // 逆时针：(x, y) -> (y, oldW - x)
+                ncx = cy;
+                ncy = oldW - cx;
+            }
+
+            stamp.x = ncx - stamp.width / 2;
+            stamp.y = ncy - stamp.height / 2;
+            stamp.rotation = normalizeStampRotation((stamp.rotation || 0) + delta);
+        });
+    });
+
+    state.doc.rotation = normalizeAngle((state.doc.rotation || 0) + delta);
+
+    if (state.doc.type === 'pdf') {
+        await renderPDFPage(state.doc.currentPage);
+    } else if (state.doc.type === 'image') {
+        await renderImageFile(state.doc.file);
+    }
+
+    updatePropUI();
+    resetViewFit();
+    showToast(delta === 90 ? '已向右旋转 90°' : '已向左旋转 90°');
 }
 
 // --- 印章交互触控 ---
@@ -1155,22 +1277,38 @@ async function exportDocument(format) {
 }
 
 async function renderHighResPageCanvas(pageNum) {
+    const rot = normalizeAngle(state.doc.rotation || 0);
     const offCanvas = document.createElement('canvas');
-    offCanvas.width = state.doc.originalWidth;
-    offCanvas.height = state.doc.originalHeight;
     const ctx = offCanvas.getContext('2d');
 
     if (state.doc.type === 'image') {
-        const img = new Image();
-        img.src = URL.createObjectURL(state.doc.file);
-        await new Promise(r => img.onload = r);
-        ctx.drawImage(img, 0, 0);
+        const img = state.doc.imageObj;
+        if (!img) return null;
+
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+        const swapped = (rot === 90 || rot === 270);
+
+        offCanvas.width  = swapped ? ih : iw;
+        offCanvas.height = swapped ? iw : ih;
+
+        ctx.save();
+        ctx.translate(offCanvas.width / 2, offCanvas.height / 2);
+        ctx.rotate((rot * Math.PI) / 180);
+        ctx.drawImage(img, -iw / 2, -ih / 2);
+        ctx.restore();
     } else if (state.doc.type === 'pdf') {
         const page = await state.doc.pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2.0 });
+        const pageRot = normalizeAngle((page.rotate || 0) + rot);
+        const viewport = page.getViewport({ scale: 2.0, rotation: pageRot });
+
+        offCanvas.width  = viewport.width;
+        offCanvas.height = viewport.height;
+
         await page.render({ canvasContext: ctx, viewport }).promise;
     }
 
+    // 绘制印章
     const stamps = state.placedStamps[pageNum] || [];
     for (let stamp of stamps) {
         ctx.save();
@@ -1203,6 +1341,10 @@ async function renderHighResPageCanvas(pageNum) {
 
 async function exportAsImage(format) {
     const canvas = await renderHighResPageCanvas(state.doc.currentPage);
+    if (!canvas) {
+        showToast('导出失败，请重新加载文档');
+        return;
+    }
     const filename = generateExportFilename(format);
     const link = document.createElement('a');
     link.download = filename;
@@ -1216,16 +1358,23 @@ async function exportAsPDF() {
 
     for (let i = 1; i <= state.doc.totalPages; i++) {
         const canvas = await renderHighResPageCanvas(i);
+        if (!canvas) continue;
+
         const imgData = canvas.toDataURL('image/jpeg', 0.92);
         const orient = canvas.width > canvas.height ? 'l' : 'p';
         
-        if (i === 1) {
+        if (pdfDoc === null) {
             pdfDoc = new jsPDF({ orientation: orient, unit: 'px', format: [canvas.width, canvas.height] });
         } else {
             pdfDoc.addPage([canvas.width, canvas.height], orient);
         }
 
         pdfDoc.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+    }
+
+    if (!pdfDoc) {
+        showToast('导出失败，请重新加载文档');
+        return;
     }
 
     const filename = generateExportFilename('pdf');

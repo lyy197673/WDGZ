@@ -254,6 +254,15 @@ body {
 }
 #zoom-level { min-width: 40px; text-align: center; font-size: 11px; }
 
+/* 缩放与旋转之间的细分隔线 */
+.zoom-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--border-subtle);
+    margin: 0 3px;
+    flex-shrink: 0;
+}
+
 .canvas-stage {
     position: absolute; transform-origin: center center;
     box-shadow: 0 16px 48px rgba(0,0,0,0.1); border-radius: 4px;
@@ -487,6 +496,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent-blue); }
     .bottom-dock { justify-content: space-around; padding: 4px 6px; gap: 3px; }
     .dock-segment { gap: 3px; }
     .glass-btn { padding: 5px 8px; font-size: 11px; }
+
+    /* 手机上浮动控制胶囊略微收紧，避免与页面按钮撞车 */
+    .floating-zoom-controls { top: 8px; right: 8px; padding: 2px 4px; }
+    .floating-zoom-controls .icon-btn { width: 28px; height: 28px; }
+    #zoom-level { min-width: 34px; font-size: 10px; }
 }
 
 /* --- 开屏使用说明弹窗 --- */
