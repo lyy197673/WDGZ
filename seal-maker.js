@@ -387,15 +387,41 @@
         });
 
         // 事件绑定：滑块 ↔ 数字框联动
+        // 从所有部件 schema 建 key→字段定义映射，用于 clamp 和默认值回退
+        const keyDefMap = {};
+        Object.values(partSchemas).forEach(schema => {
+            schema.fields.forEach(fd => { keyDefMap[fd.key] = fd; });
+        });
+
         formBody.querySelectorAll('[data-sm-key]').forEach(el => {
             const key = el.dataset.smKey;
             el.addEventListener('input', () => {
-                let v = el.type === 'number' ? parseFloat(el.value) : el.value;
-                if (typeof v === 'number' && isNaN(v)) v = f.min;
+                let raw = el.value;
+                let v;
+                const def = keyDefMap[key];
+                if (el.type === 'number' || el.type === 'range') {
+                    v = parseFloat(raw);
+                    if (isNaN(v)) { v = def ? SM.state[key] : 0; }
+                    // clamp 到 min/max
+                    if (def) {
+                        if (def.min !== undefined) v = Math.max(def.min, v);
+                        if (def.max !== undefined) v = Math.min(def.max, v);
+                    }
+                } else {
+                    v = raw;
+                }
                 SM.state[key] = v;
                 // 双向同步
                 formBody.querySelectorAll(`[data-sm-key="${key}"]`).forEach(syncEl => {
-                    if (syncEl !== el) syncEl.value = v;
+                    if (syncEl !== el) {
+                        // 同步 range 时也要 clamp
+                        if (syncEl.type === 'range' && def) {
+                            const clamped = Math.max(def.min, Math.min(def.max, v));
+                            syncEl.value = clamped;
+                        } else {
+                            syncEl.value = v;
+                        }
+                    }
                 });
                 SM.renderSeal();
             });
