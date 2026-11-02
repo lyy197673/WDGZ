@@ -107,6 +107,16 @@
             </div>
             
             <div class="toolbar-center">
+                <!-- 模式切换：文档盖章 ↔ 印章制作 -->
+                <div class="mode-segment">
+                    <button class="mode-btn active" data-mode="stamp" id="btn-mode-stamp">
+                        <i class="fa-solid fa-file-lines"></i> 文档盖章
+                    </button>
+                    <button class="mode-btn" data-mode="maker" id="btn-mode-maker">
+                        <i class="fa-solid fa-pen-ruler"></i> 印章制作
+                    </button>
+                </div>
+
                 <!-- 移动端弹窗触发按钮 -->
                 <button id="btn-toggle-left-sidebar" class="glass-btn xs primary-subtle mobile-only">
                     <i class="fa-solid fa-box-archive"></i> 印章库
@@ -183,6 +193,8 @@
                 <div class="canvas-stage" id="canvas-stage">
                     <canvas id="doc-canvas"></canvas>
                     <div id="stamp-layer" class="stamp-layer"></div>
+                    <!-- 印章制作模式专用 Canvas -->
+                    <canvas id="seal-canvas" class="seal-canvas hidden"></canvas>
                 </div>
 
                 <!-- 上传提示卡片 -->
@@ -193,6 +205,23 @@
                         </div>
                         <h2>单击或拖拽文件到此处上传文档</h2>
                         <p>支持 PNG、JPG、WEBP、PDF 格式文档</p>
+                    </div>
+                </div>
+
+                <!-- 印章制作模式底部 Dock -->
+                <div class="maker-dock-wrapper hidden" id="maker-dock-wrapper">
+                    <div class="bottom-dock glass-pill">
+                        <div class="dock-segment doc-actions">
+                            <button id="btn-maker-random" class="glass-btn primary-subtle" title="随机做旧效果">
+                                <i class="fa-solid fa-shuffle"></i> 随机做旧
+                            </button>
+                            <button id="btn-maker-download-png" class="glass-btn" title="下载 PNG 到本地">
+                                <i class="fa-solid fa-download"></i> 导出 PNG
+                            </button>
+                            <button id="btn-maker-save-library" class="glass-btn accent-green" title="存入库（刷新后仍存在）">
+                                <i class="fa-solid fa-database"></i> 存入印章库
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -228,13 +257,16 @@
                 </div>
             </section>
 
-            <!-- 右侧：印章微调面板 -->
+            <!-- 右侧：印章微调面板 ↔ 印章制作面板 -->
             <aside class="sidebar sidebar-right glass-panel modal-card" id="sidebar-right">
                 <div class="sidebar-header">
-                    <h3><i class="fa-solid fa-sliders"></i> 印章微调面板</h3>
-                    <button class="icon-btn mobile-only btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+                    <h3 id="right-panel-title"><i class="fa-solid fa-sliders"></i> 印章微调面板</h3>
+                    <div class="sidebar-actions">
+                        <button class="icon-btn mobile-only btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
                 </div>
                 
+                <!-- ===== 面板一：文档盖章模式 - 印章微调 ===== -->
                 <div id="prop-content" class="prop-content">
                     <div class="empty-tip" id="prop-empty-tip">
                         <i class="fa-solid fa-arrow-pointer"></i>
@@ -310,6 +342,21 @@
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <!-- ===== 面板二：印章制作模式 ===== -->
+                <div id="prop-content-maker" class="prop-content hidden">
+                    <!-- 部件选择 tab -->
+                    <div class="maker-part-tabs">
+                        <button class="maker-tab active" data-part="aging">做旧</button>
+                        <button class="maker-tab" data-part="border">边框</button>
+                        <button class="maker-tab" data-part="topText">上弧文字</button>
+                        <button class="maker-tab" data-part="center">中心</button>
+                        <button class="maker-tab" data-part="middleText">横排</button>
+                        <button class="maker-tab" data-part="bottomText">底部</button>
+                    </div>
+                    <!-- 参数表单 -->
+                    <div id="maker-form-body" class="maker-form-body"></div>
                 </div>
             </aside>
         </main>
@@ -388,6 +435,8 @@
         </div>
     </div>
 
+    <!-- seal-maker.js 先加载（Canvas绘制引擎），app.js 后加载（模式切换桥接） -->
+    <script src="seal-maker.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

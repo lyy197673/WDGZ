@@ -2,14 +2,19 @@
  * StampMaster Pro - 在线文档盖章引擎
  */
 
-// --- IndexedDB 自动化句柄持久化库 ---
+// --- IndexedDB 持久化 ---
 const DB_NAME = 'StampMasterDB';
-const STORE_NAME = 'handles';
+const STORE_HANDLES = 'handles';
+const STORE_CUSTOM_SEALS = 'customSeals';
 
 function openDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
+        const req = indexedDB.open(DB_NAME, 2); // v2: 新增 customSeals store
+        req.onupgradeneeded = (e) => {
+            const db = req.result;
+            if (e.oldVersion < 1) db.createObjectStore(STORE_HANDLES);
+            if (e.oldVersion < 2) db.createObjectStore(STORE_CUSTOM_SEALS, { keyPath: 'id' });
+        };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
     });
@@ -17,22 +22,45 @@ function openDB() {
 
 async function saveDirHandle(handle) {
     const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(handle, 'rootDir');
+    const tx = db.transaction(STORE_HANDLES, 'readwrite');
+    tx.objectStore(STORE_HANDLES).put(handle, 'rootDir');
 }
 
 async function getSavedDirHandle() {
     try {
         const db = await openDB();
         return new Promise((resolve) => {
-            const tx = db.transaction(STORE_NAME, 'readonly');
-            const req = tx.objectStore(STORE_NAME).get('rootDir');
+            const tx = db.transaction(STORE_HANDLES, 'readonly');
+            const req = tx.objectStore(STORE_HANDLES).get('rootDir');
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => resolve(null);
         });
     } catch (e) {
         return null;
     }
+}
+
+// —— 自制印章（参数快照）CRUD ——
+async function saveCustomSeal(seal) {
+    const db = await openDB();
+    const tx = db.transaction(STORE_CUSTOM_SEALS, 'readwrite');
+    tx.objectStore(STORE_CUSTOM_SEALS).put(seal);
+}
+async function getAllCustomSeals() {
+    try {
+        const db = await openDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(STORE_CUSTOM_SEALS, 'readonly');
+            const req = tx.objectStore(STORE_CUSTOM_SEALS).getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
+        });
+    } catch (e) { return []; }
+}
+async function deleteCustomSeal(id) {
+    const db = await openDB();
+    const tx = db.transaction(STORE_CUSTOM_SEALS, 'readwrite');
+    tx.objectStore(STORE_CUSTOM_SEALS).delete(id);
 }
 
 // 统一 Mouse / Touch 触摸坐标
@@ -241,10 +269,165 @@ const dom = {
     btnOnboardStart: document.getElementById('btn-onboard-start')
 };
 
+// --- 印章制作器融合桥接（三栏布局模式切换） ---
+const sealMakerBridge = {
+    initialized: false,
+    init() {
+        // 模式切换按钮
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.switchMode(btn.dataset.mode));
+        });
+
+        // 右侧印章制作面板：两个快捷按钮
+        document.getElementById('btn-maker-random')?.addEventListener('click', () => {
+            if (window.SealMaker) {
+                window.SealMaker.randomizeAging();
+                showToast('🎲 已生成新的随机做旧效果');
+            }
+        });
+        // 导出PNG（下载）
+        document.getElementById('btn-maker-download-png')?.addEventListener('click', () => {
+            if (!window.SealMaker) return;
+            window.SealMaker.exportPNG();
+            showToast('📥 PNG 已开始下载');
+        });
+        // 存入库（持久化参数）
+        document.getElementById('btn-maker-save-library')?.addEventListener('click', () => this.saveToLibrary());
+
+        // 左侧印章库「自制印章」条目的编辑/删除按钮（事件委托）
+        document.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.custom-seal-edit');
+            const delBtn = e.target.closest('.custom-seal-delete');
+            if (editBtn) {
+                const id = Number(editBtn.dataset.id);
+                this.loadCustomSealForEdit(id);
+            }
+            if (delBtn) {
+                e.stopPropagation();
+                const id = Number(delBtn.dataset.id);
+                this.deleteCustomSealFromLibrary(id);
+            }
+        });
+    },
+
+    switchMode(mode) {
+        const isMaker = mode === 'maker';
+
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+        // maker 模式显示印章制作 dock、隐藏文档操作 dock；stamp 模式相反
+        document.getElementById('maker-dock-wrapper').classList.toggle('hidden', !isMaker);
+        document.querySelector('.bottom-dock-wrapper').classList.toggle('hidden', isMaker);
+        if (isMaker) document.getElementById('page-controls').style.display = 'none';
+
+        const docCanvas = document.getElementById('doc-canvas');
+        const stampLayer = document.getElementById('stamp-layer');
+        const sealCanvas = document.getElementById('seal-canvas');
+        const dropZone = document.getElementById('drop-zone-overlay');
+
+        if (isMaker) {
+            docCanvas?.classList.add('hidden');
+            stampLayer?.classList.add('hidden');
+            sealCanvas?.classList.remove('hidden');
+            dropZone?.classList.add('hidden');
+        } else {
+            docCanvas?.classList.remove('hidden');
+            stampLayer?.classList.remove('hidden');
+            sealCanvas?.classList.add('hidden');
+            if (!state.doc.file) dropZone?.classList.remove('hidden');
+            else dropZone?.classList.add('hidden');
+        }
+
+        const propContent = document.getElementById('prop-content');
+        const propContentMaker = document.getElementById('prop-content-maker');
+        const rightTitle = document.getElementById('right-panel-title');
+
+        if (isMaker) {
+            propContent?.classList.add('hidden');
+            propContentMaker?.classList.remove('hidden');
+            rightTitle.innerHTML = '<i class="fa-solid fa-pen-ruler"></i> 印章制作 · 参数面板';
+        } else {
+            propContent?.classList.remove('hidden');
+            propContentMaker?.classList.add('hidden');
+            rightTitle.innerHTML = '<i class="fa-solid fa-sliders"></i> 印章微调面板';
+            updatePropUI();
+        }
+
+        if (isMaker && !this.initialized && window.SealMaker) {
+            if (SealMaker.init()) this.initialized = true;
+        }
+    },
+
+    async saveToLibrary() {
+        if (!window.SealMaker) return;
+        const params = SealMaker.snapshot();
+        const seal = {
+            id: Date.now(),
+            name: (params.topText || '自制印章').replace(/[\\/:*?"<>|]/g, '_'),
+            params: params,
+            createdAt: Date.now()
+        };
+        await saveCustomSeal(seal);
+        // 同时把当前状态塞到印章库 → 盖章时会用 params 动态生成
+        const newItem = await this._makeLibraryItem(seal);
+        // 去重：如果已有同名先删
+        state.stampLibrary = state.stampLibrary.filter(s => !(s.folder === '自制印章' && s.name === newItem.name));
+        state.stampLibrary.unshift(newItem);
+        state.openFolders.add('自制印章');
+        renderStampLibraryUI();
+        showToast(`💾 印章「${newItem.name}」已存入库（刷新页面也在）`);
+    },
+
+    async _makeLibraryItem(seal) {
+        // 关键：存 params，盖章时临时调用 SealMaker.renderToDataURL 生成 url
+        let url = '';
+        if (window.SealMaker) {
+            url = SealMaker.renderToDataURL(seal.params);
+        }
+        return {
+            folder: '自制印章',
+            name: seal.name,
+            url: url,
+            params: seal.params,   // 参数快照
+            customId: seal.id      // 用于 DB 增删
+        };
+    },
+
+    async loadAllCustomSeals() {
+        const seals = await getAllCustomSeals();
+        for (const seal of seals) {
+            const item = await this._makeLibraryItem(seal);
+            state.stampLibrary.unshift(item);
+            state.openFolders.add('自制印章');
+        }
+    },
+
+    async loadCustomSealForEdit(id) {
+        const seals = await getAllCustomSeals();
+        const target = seals.find(s => s.id === id);
+        if (!target || !window.SealMaker) return;
+        // 切到印章制作模式 + 载入参数
+        this.switchMode('maker');
+        setTimeout(() => {
+            SealMaker.loadFromSnapshot(target.params);
+            showToast(`✏️ 已载入「${target.name}」参数，可继续编辑`);
+        }, 80);
+    },
+
+    async deleteCustomSealFromLibrary(id) {
+        await deleteCustomSeal(id);
+        state.stampLibrary = state.stampLibrary.filter(s => s.customId !== id);
+        renderStampLibraryUI();
+        showToast('🗑️ 印章已删除');
+    }
+};
+
 // --- 初始化程序 ---
 window.addEventListener('DOMContentLoaded', async () => {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     initEvents();
+    sealMakerBridge.init();
     await autoDetectStamps();
 });
 
@@ -261,24 +444,31 @@ async function autoDetectStamps() {
                 (await savedHandle.requestPermission(options)) === 'granted') {
                 await scanDirectoryHandle(savedHandle, '');
                 updateDirStatus(`已加载目录 [${savedHandle.name}] - ${state.stampLibrary.length} 印章`, false);
-                renderStampLibraryUI();
-                return;
+            } else {
+                savedHandle = null;
             }
-        } catch (e) { console.log('Restore handle fallback'); }
+        } catch (e) { savedHandle = null; }
     }
 
-    try {
-        const resp = await fetch('./stamps.json');
-        if (resp.ok) {
-            const list = await resp.json();
-            state.stampLibrary = list;
-            updateDirStatus(`已加载 ${list.length} 个印章`, false);
-            renderStampLibraryUI();
-            return;
-        }
-    } catch (e) {}
+    // 如果没有目录句柄，尝试 stamps.json
+    if (!savedHandle) {
+        try {
+            const resp = await fetch('./stamps.json');
+            if (resp.ok) {
+                state.stampLibrary = await resp.json();
+                updateDirStatus(`已加载 ${state.stampLibrary.length} 个印章`, false);
+            }
+        } catch (e) {}
+    }
 
-    updateDirStatus('可点击更改目录', true);
+    // 关键：自制印章始终加载（独立于目录/stamps.json）
+    await sealMakerBridge.loadAllCustomSeals();
+
+    if (state.stampLibrary.length === 0) {
+        updateDirStatus('可点击更改目录', true);
+    }
+
+    renderStampLibraryUI();
 }
 
 // 更改识别目录
@@ -378,12 +568,27 @@ function renderStampLibraryUI() {
             const card = document.createElement('div');
             card.className = 'stamp-item';
             card.draggable = true;
-            card.innerHTML = `<img src="${stamp.url}" alt="${stamp.name}"><span>${stamp.name}</span>`;
+
+            // 自制印章右上角加编辑/删除按钮
+            const isCustom = stamp.folder === '自制印章' && stamp.customId;
+            const actionHtml = isCustom ? `
+                <div class="custom-seal-actions">
+                    <button class="custom-seal-btn custom-seal-edit" data-id="${stamp.customId}" title="编辑印章">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                    <button class="custom-seal-btn custom-seal-delete" data-id="${stamp.customId}" title="删除印章">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>` : '';
+
+            card.innerHTML = `${actionHtml}<img src="${stamp.url}" alt="${stamp.name}"><span>${stamp.name}</span>`;
 
             card.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', JSON.stringify(stamp));
             });
-            card.addEventListener('click', () => {
+            card.addEventListener('click', (e) => {
+                // 点编辑/删除按钮时不触发盖章
+                if (e.target.closest('.custom-seal-btn')) return;
                 addStampToCanvas(stamp);
                 closeModals();
             });
@@ -940,8 +1145,14 @@ dom.viewport.addEventListener('drop', (e) => {
 function addStampToCanvas(stampData, targetX, targetY) {
     if (!state.doc.file) return;
 
+    // 自制印章：如果没有 url 或 url 为空，用 params 临时生成
+    let url = stampData.url;
+    if (!url && stampData.params && window.SealMaker) {
+        url = SealMaker.renderToDataURL(stampData.params);
+    }
+
     const img = new Image();
-    img.src = stampData.url;
+    img.src = url;
     img.onload = () => {
         const defaultWidth = Math.max(120, state.doc.originalWidth * 0.18);
         const defaultHeight = defaultWidth * (img.height / img.width);
@@ -954,7 +1165,7 @@ function addStampToCanvas(stampData, targetX, targetY) {
             pageNum: state.doc.currentPage,
             name: stampData.name || '印章',
             imgObj: img,
-            url: stampData.url,
+            url: url,
             x, y,
             width: defaultWidth,
             height: defaultHeight,

@@ -236,9 +236,37 @@ body {
     background: var(--item-bg); border: 1px solid var(--glass-border);
     border-radius: 12px; padding: 8px; display: flex; flex-direction: column; align-items: center;
     cursor: pointer;
+    position: relative;
 }
 .stamp-item img { width: 60px; height: 60px; object-fit: contain; pointer-events: none; }
 .stamp-item span { font-size: 10px; margin-top: 4px; color: var(--text-primary); font-weight: 500; text-align: center; word-break: break-all; }
+
+/* 自制印章：右上角编辑/删除按钮 */
+.custom-seal-actions {
+    position: absolute; top: 2px; right: 2px;
+    display: flex; gap: 2px;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    z-index: 2;
+}
+.stamp-item:hover .custom-seal-actions { opacity: 1; }
+.custom-seal-btn {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.55);
+    color: white;
+    font-size: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+}
+.custom-seal-btn:hover { background: rgba(0,0,0,0.8); }
+.custom-seal-btn.custom-seal-delete:hover { background: #ef4444; }
+/* 小屏常显 */
+@media (max-width: 768px) {
+    .custom-seal-actions { opacity: 1; }
+}
 
 /* 画布主视图区域 */
 .viewport-container {
@@ -308,6 +336,10 @@ body {
 
 /* 屏幕底部居中 Export Dock */
 .bottom-dock-wrapper {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 100; pointer-events: auto;
+}
+/* 印章制作模式底部 Dock（与 bottom-dock 互斥显示） */
+.maker-dock-wrapper {
     position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 100; pointer-events: auto;
 }
 .bottom-dock { padding: 4px 10px; display: flex; align-items: center; gap: 8px; }
@@ -574,3 +606,162 @@ input[type="range"] { width: 100%; accent-color: var(--accent-blue); }
     user-select: none;
 }
 .onboard-checkbox input { accent-color: var(--accent-blue); width: 15px; height: 15px; cursor: pointer; }
+
+/* ============================================
+   融合版：印章制作器样式（与三栏布局同级）
+   全部使用 --accent-blue 等现有变量
+   ============================================ */
+
+/* --- 模式切换 segmented control --- */
+.mode-segment {
+    display: inline-flex;
+    background: var(--item-bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 2px;
+}
+.mode-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+}
+.mode-btn:hover { color: var(--text-primary); }
+.mode-btn.active {
+    background: var(--accent-blue);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+}
+
+/* --- 中间画布区：印章 Canvas --- */
+.seal-canvas {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: transparent;
+    cursor: default;
+    border-radius: 8px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.08);
+}
+.seal-canvas.hidden { display: none; }
+
+/* --- hidden 工具类（模式切换时显隐） --- */
+.hidden { display: none !important; }
+
+/* --- 右侧面板：印章制作 tab 切换 --- */
+.maker-part-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--soft-surface);
+}
+.maker-tab {
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    background: var(--item-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+.maker-tab:hover { color: var(--text-primary); border-color: var(--accent-blue); }
+.maker-tab.active {
+    background: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue);
+    box-shadow: 0 2px 6px rgba(0,122,255,0.25);
+}
+
+/* --- 右侧面板：印章制作表单 --- */
+.maker-form-body {
+    padding: 12px 14px;
+    overflow-y: auto;
+    flex: 1;
+    -webkit-overflow-scrolling: touch;
+}
+.maker-field {
+    margin-bottom: 14px;
+}
+.maker-field-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+.maker-field-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.maker-field-control input[type="range"] {
+    flex: 1;
+    height: 4px;
+    border-radius: 3px;
+}
+.maker-field-control input[type="number"] {
+    width: 68px;
+    padding: 4px 6px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: right;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    outline: none;
+}
+.maker-field-control input[type="number"]:focus,
+.maker-text-input:focus,
+.glass-select:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(0,122,255,0.12);
+}
+.maker-text-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    font-size: 12px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    outline: none;
+}
+.maker-color-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.maker-color-row input[type="color"] {
+    width: 32px; height: 32px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 2px;
+    background: var(--item-bg);
+    cursor: pointer;
+}
+.maker-color-hex { width: 110px; }
+
+/* --- 印章 canvas 容器在模式切换时调整 --- */
+.canvas-stage.seal-mode #doc-canvas,
+.canvas-stage.seal-mode #stamp-layer {
+    display: none;
+}
+
+/* --- 小屏适配 --- */
+@media (max-width: 900px) {
+    .mode-segment { padding: 2px; border-radius: 8px; }
+    .mode-btn { padding: 4px 8px; font-size: 11px; }
+    .mode-btn i { display: none; }
+}
